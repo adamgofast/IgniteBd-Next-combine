@@ -12,7 +12,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
-import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDNsO_LnQ7t3L_KWejjCuUQxxkI3r0iRxM',
@@ -28,15 +28,7 @@ const app = initializeApp(firebaseConfig);
 
 let analytics = null;
 if (typeof window !== 'undefined') {
-  isSupported()
-    .then((supported) => {
-      if (supported) {
-        analytics = getAnalytics(app);
-      }
-    })
-    .catch((error) => {
-      console.warn('Analytics unsupported:', error);
-    });
+  analytics = getAnalytics(app);
 }
 
 export const auth = getAuth(app);
