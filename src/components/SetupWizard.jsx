@@ -1,8 +1,10 @@
-import { useNavigate } from 'react-router-dom';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { CheckCircle2, Circle, ArrowRight } from 'lucide-react';
 
 export default function SetupWizard({ companyHQ, hasContacts = false, onComplete }) {
-  const navigate = useNavigate();
+  const router = useRouter();
   
   // Check what's been completed
   const hasCompany = companyHQ && companyHQ.id;
@@ -76,7 +78,7 @@ export default function SetupWizard({ companyHQ, hasContacts = false, onComplete
         {steps.map((step, index) => (
           <button
             key={step.id}
-            onClick={() => navigate(step.route)}
+            onClick={() => router.push(step.route)}
             className={`relative flex items-center gap-2 p-2.5 rounded-md border transition-all text-left group ${
               step.completed
                 ? 'bg-green-50 border-green-200 hover:bg-green-100'
