@@ -50,6 +50,10 @@ export default function AppShell({ children }) {
     return ROUTES_WITH_SIDEBAR.some((route) => pathname.startsWith(route));
   }, [pathname]);
 
+  if (!showSidebar) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {showSidebar && (
