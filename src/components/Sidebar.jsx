@@ -34,6 +34,11 @@ const navigationGroups = [
     items: [
       { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: Building2 },
+    ],
+  },
+  {
+    name: 'BD Assets',
+    items: [
       { name: 'Personas', path: '/personas', icon: UserCircle },
       { name: 'Products & Services', path: '/products', icon: Package },
       { name: 'Proposals', path: '/proposals', icon: FileCheck },
