@@ -13,15 +13,23 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const firebaseAuth = getAuth();
-    const user = firebaseAuth.currentUser;
+    try {
+      const firebaseAuth = getAuth();
+      const user = firebaseAuth.currentUser;
 
-    if (user) {
-      try {
-        const token = await user.getIdToken();
-        config.headers.Authorization = `Bearer ${token}`;
-      } catch (error) {
-        console.error('Failed to fetch Firebase token:', error);
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          config.headers.Authorization = `Bearer ${token}`;
+        } catch (error) {
+          console.error('Failed to fetch Firebase token:', error);
+        }
+      }
+    } catch (error) {
+      // Firebase not initialized yet - skip token for now
+      // This can happen on initial page load before Firebase is ready
+      if (error.code !== 'app/no-app') {
+        console.warn('Firebase auth not available:', error.message);
       }
     }
 
