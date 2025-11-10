@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom';
+'use client';
+
+import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 /**
@@ -24,7 +26,7 @@ export default function PageHeader({
       {/* Back Link */}
       {backTo && (
         <Link
-          to={backTo}
+          href={backTo}
           className="text-sm text-gray-600 hover:text-gray-900 mb-6 inline-flex items-center gap-1 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />

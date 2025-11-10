@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileSpreadsheet, User, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -9,6 +9,22 @@ export default function ContactUploadPage() {
   const router = useRouter();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="mb-2 text-2xl font-bold text-gray-900">Loading...</div>
+          <div className="text-gray-600">Preparing contact upload</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFileSelect = (event) => {
     const selectedFile = event.target.files?.[0];
