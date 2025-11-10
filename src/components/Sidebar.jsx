@@ -35,7 +35,7 @@ const navigationGroups = [
       { name: 'People Hub', path: '/contacts', icon: Users },
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: Building2 },
       { name: 'Personas', path: '/personas', icon: UserCircle },
-      { name: 'Products', path: '/products', icon: Package },
+      { name: 'Products & Services', path: '/products', icon: Package },
       { name: 'Proposals', path: '/proposals', icon: FileCheck },
     ],
   },
