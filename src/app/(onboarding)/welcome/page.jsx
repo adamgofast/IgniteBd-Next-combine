@@ -41,9 +41,7 @@ export default function WelcomePage() {
 
         setOwner(ownerData);
 
-        if (!ownerData.name || ownerData.name.trim() === '') {
-          setNextRoute('/profilesetup');
-        } else if (!ownerData.companyHQId || !ownerData.ownedCompanies?.length) {
+        if (!ownerData.companyHQId || !ownerData.ownedCompanies?.length) {
           setNextRoute('/company/create-or-choose');
         } else {
           setNextRoute('/growth-dashboard');
