@@ -55,7 +55,7 @@ export default function ProductsPage() {
         <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-gray-900">
-              📦 Products
+              📦 Products & Services
             </h1>
             <p className="text-gray-600">
               Define your products and services to power BD Intelligence scoring.
@@ -67,7 +67,7 @@ export default function ProductsPage() {
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               <Plus className="h-4 w-4" />
-              Add Product
+              Add Product/Service
             </Link>
           </div>
         </div>
@@ -91,10 +91,10 @@ export default function ProductsPage() {
               </div>
             </div>
             <h2 className="mb-3 text-2xl font-bold text-gray-900">
-              Create Your First Product
+              Create Your First Product/Service
             </h2>
             <p className="mb-2 text-lg text-gray-700">
-              Products power BD Intelligence scoring
+              Products & Services power BD Intelligence scoring
             </p>
             <p className="mb-8 text-gray-600">
               Define your value propositions to match contacts with the right offers

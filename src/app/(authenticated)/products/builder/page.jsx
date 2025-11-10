@@ -13,6 +13,13 @@ const DEFAULT_VALUES = {
   companyId: '',
 };
 
+// Prefilled template for business development platform
+const BD_PLATFORM_TEMPLATE = {
+  name: 'Business Development Platform',
+  valueProp: 'Provide a platform for business development growth.',
+  description: '',
+};
+
 export default function ProductBuilderPage({ searchParams }) {
   const router = useRouter();
   const productId = searchParams?.productId || null;
@@ -54,13 +61,20 @@ export default function ProductBuilderPage({ searchParams }) {
     }
   }, []);
 
-  // Set companyId when derivedCompanyId is available
+  // Pre-fill form with test data when creating a new product (not editing)
   useEffect(() => {
-    if (derivedCompanyId && !hasInitialized) {
+    if (!productId && derivedCompanyId && !hasInitialized) {
+      // Pre-fill with template for testing upsert logic
+      reset({
+        ...BD_PLATFORM_TEMPLATE,
+        companyId: derivedCompanyId,
+      });
+      setHasInitialized(true);
+    } else if (derivedCompanyId && !hasInitialized) {
       setValue('companyId', derivedCompanyId);
       setHasInitialized(true);
     }
-  }, [derivedCompanyId, setValue, hasInitialized]);
+  }, [derivedCompanyId, productId, setValue, reset, hasInitialized]);
 
   // Fetch product data if editing
   useEffect(() => {
@@ -191,11 +205,11 @@ export default function ProductBuilderPage({ searchParams }) {
             <div className="flex items-center gap-3 mb-2">
               <Package className="h-8 w-8 text-blue-600" />
               <h1 className="text-3xl font-bold text-gray-900">
-                {productId ? 'Edit Product' : 'Create Product'}
+                {productId ? 'Edit Product/Service' : 'Create Product/Service'}
               </h1>
             </div>
             <p className="text-sm text-gray-600">
-              Define your product's value proposition to power BD Intelligence scoring.
+              Define your product or service value proposition to power BD Intelligence scoring.
             </p>
           </div>
 
@@ -211,6 +225,29 @@ export default function ProductBuilderPage({ searchParams }) {
             </div>
           )}
 
+          {/* Template Helper - Only show when creating new product */}
+          {!productId && (
+            <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="mb-3 text-sm text-gray-600">
+                Form is pre-filled with template data. Edit as needed.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  reset({
+                    ...BD_PLATFORM_TEMPLATE,
+                    companyId: derivedCompanyId,
+                  });
+                  handleShowToast('Template reloaded!');
+                }}
+                disabled={isBusy}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:opacity-60"
+              >
+                Reload Template
+              </button>
+            </div>
+          )}
+
           <form onSubmit={onSubmit} className="space-y-6">
             <input
               type="hidden"
@@ -220,15 +257,15 @@ export default function ProductBuilderPage({ searchParams }) {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Product Name <span className="text-red-500">*</span>
+                Product/Service Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g., Ignite CRM Automation"
+                placeholder="e.g., Business Development Platform, Ignite CRM Automation"
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 disabled={isBusy}
                 {...register('name', {
-                  required: 'Product name is required.',
+                  required: 'Product/Service name is required.',
                 })}
               />
               {errors.name && (
@@ -284,7 +321,7 @@ export default function ProductBuilderPage({ searchParams }) {
                 className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
                 disabled={isBusy || !productName?.trim()}
               >
-                {isSubmitting ? 'Saving…' : 'Save Product'}
+                {isSubmitting ? 'Saving…' : 'Save Product/Service'}
               </button>
             </div>
           </form>
