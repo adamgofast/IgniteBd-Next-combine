@@ -82,8 +82,22 @@ export default function SettingsPage() {
   };
 
   // Handle Microsoft connection
-  const handleConnectMicrosoft = () => {
-    window.location.href = '/api/microsoft/login';
+  const handleConnectMicrosoft = async () => {
+    try {
+      // Make authenticated API call to get OAuth URL
+      const response = await api.get('/api/microsoft/login');
+      
+      // If the response is a redirect, follow it
+      if (response.data?.authUrl) {
+        window.location.href = response.data.authUrl;
+      } else if (response.request?.responseURL) {
+        // Handle redirect response
+        window.location.href = response.request.responseURL;
+      }
+    } catch (err) {
+      console.error('Failed to initiate Microsoft OAuth:', err);
+      setError(err.response?.data?.error || 'Failed to connect Microsoft account');
+    }
   };
 
   // Handle profile update

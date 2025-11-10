@@ -54,7 +54,12 @@ export async function GET(request) {
 
     const authUrl = `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID || 'common'}/oauth2/v2.0/authorize?${params}`;
 
-    return NextResponse.redirect(authUrl);
+    // Return JSON with auth URL for client-side redirect
+    // This allows the authenticated API call to succeed, then client redirects
+    return NextResponse.json({
+      success: true,
+      authUrl,
+    });
   } catch (error) {
     console.error('Microsoft OAuth login error:', error);
     return NextResponse.json(
