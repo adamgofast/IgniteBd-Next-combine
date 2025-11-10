@@ -73,8 +73,9 @@ export async function GET(req) {
       throw new Error('Failed to acquire tokens');
     }
 
-    // Get user's email from Microsoft Graph
+    // Get user's email and display name from Microsoft Graph
     let microsoftEmail = null;
+    let microsoftDisplayName = null;
     try {
       const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
         headers: {
@@ -85,10 +86,11 @@ export async function GET(req) {
       if (graphResponse.ok) {
         const userData = await graphResponse.json();
         microsoftEmail = userData.mail || userData.userPrincipalName;
+        microsoftDisplayName = userData.displayName || userData.givenName || userData.mail || null;
       }
     } catch (err) {
-      console.warn('Failed to fetch user email from Graph:', err);
-      // Continue without email - not critical
+      console.warn('Failed to fetch user data from Graph:', err);
+      // Continue without email/name - not critical
     }
 
     // Calculate token expiration
@@ -102,6 +104,7 @@ export async function GET(req) {
         microsoftRefreshToken: tokenResponse.refreshToken || '',
         microsoftExpiresAt: expiresAt,
         microsoftEmail: microsoftEmail,
+        microsoftDisplayName: microsoftDisplayName,
       },
     });
 

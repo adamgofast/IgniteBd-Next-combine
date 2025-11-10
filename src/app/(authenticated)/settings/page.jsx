@@ -439,7 +439,7 @@ export default function SettingsPage() {
                                 Connected
                               </p>
                               <p className="text-xs text-green-700">
-                                {microsoftAuth.email || 'Microsoft account connected'}
+                                {microsoftAuth.displayName || microsoftAuth.email || 'Microsoft account connected'}
                               </p>
                             </div>
                           </div>

@@ -20,6 +20,7 @@ model Owner {
   microsoftRefreshToken String?  // Refresh token for getting new access tokens
   microsoftExpiresAt    DateTime? // Token expiration timestamp
   microsoftEmail        String?  // Microsoft account email (for display)
+  microsoftDisplayName  String?  // Microsoft account display name (for display)
   
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

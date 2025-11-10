@@ -28,6 +28,7 @@ export async function GET(request) {
     const microsoftAuth = owner.microsoftAccessToken
       ? {
           email: owner.microsoftEmail,
+          displayName: owner.microsoftDisplayName,
           expiresAt: owner.microsoftExpiresAt,
         }
       : null;

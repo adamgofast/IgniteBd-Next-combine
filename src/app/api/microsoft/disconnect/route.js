@@ -32,6 +32,7 @@ export async function DELETE(request) {
         microsoftRefreshToken: null,
         microsoftExpiresAt: null,
         microsoftEmail: null,
+        microsoftDisplayName: null,
       },
     });
 
