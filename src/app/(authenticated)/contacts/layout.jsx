@@ -18,6 +18,9 @@ const ContactsContext = createContext({
   hydrated: false,
   hydrating: false,
   refreshContacts: async () => {},
+  updateContact: (contactId, updates) => {},
+  addContact: (contact) => {},
+  removeContact: (contactId) => {},
 });
 
 export function useContacts() {
@@ -34,7 +37,7 @@ export default function ContactsLayout({ children }) {
   const [hydrated, setHydrated] = useState(false);
   const [hydrating, setHydrating] = useState(false);
 
-  // Step 1: Check localStorage cache
+  // Step 1: Check localStorage cache on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -61,9 +64,11 @@ export default function ContactsLayout({ children }) {
       const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
       const fetchedContacts = response.data?.contacts ?? [];
       
+      // Ensure pipeline data is included (audience and stage)
+      // API already includes pipeline: true, so contacts should have pipeline.pipeline and pipeline.stage
       setContacts(fetchedContacts);
       
-      // Step 3: Store in localStorage
+      // Step 3: Store in localStorage (includes pipeline data)
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('contacts', JSON.stringify(fetchedContacts));
       }
@@ -82,6 +87,41 @@ export default function ContactsLayout({ children }) {
     }
   }, [companyHQId, hydrated, refreshContacts]);
 
+  // Helper: Update a single contact in state and localStorage
+  const updateContact = useCallback((contactId, updates) => {
+    setContacts((prev) => {
+      const updated = prev.map((contact) =>
+        contact.id === contactId ? { ...contact, ...updates } : contact
+      );
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contacts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
+  // Helper: Add a new contact to state and localStorage
+  const addContact = useCallback((contact) => {
+    setContacts((prev) => {
+      const updated = [...prev, contact];
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contacts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
+  // Helper: Remove a contact from state and localStorage
+  const removeContact = useCallback((contactId) => {
+    setContacts((prev) => {
+      const updated = prev.filter((contact) => contact.id !== contactId);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('contacts', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
+
   const contextValue = useMemo(
     () => ({
       contacts,
@@ -90,8 +130,11 @@ export default function ContactsLayout({ children }) {
       hydrated,
       hydrating,
       refreshContacts,
+      updateContact,
+      addContact,
+      removeContact,
     }),
-    [contacts, companyHQId, hydrated, hydrating, refreshContacts],
+    [contacts, companyHQId, hydrated, hydrating, refreshContacts, updateContact, addContact, removeContact],
   );
 
   return (
