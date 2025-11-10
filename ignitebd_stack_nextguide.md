@@ -605,6 +605,7 @@ export function usePipelines() {
 
 ## Related Documentation
 
+- **`HYDRATION_ARCHITECTURE.md`** - **⭐ Core hydration architecture** (ownerId → companyHQId → everything)
 - **`Ignitebd_stack_devguide.md`** - Original stack documentation (React + Express)
 - **`docs/NextAppArchitecture.md`** - Next.js App Router architecture details
 - **`IGNITE_ARCHITECTURE.md`** - Complete database schema and data flow
