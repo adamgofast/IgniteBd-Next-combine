@@ -14,27 +14,33 @@ import { prisma } from './prisma';
  */
 export async function getValidAccessToken(ownerId) {
   try {
-    // Get Microsoft auth record
-    const microsoftAuth = await prisma.microsoftAuth.findUnique({
-      where: { ownerId },
+    // Get Owner record with Microsoft auth fields
+    const owner = await prisma.owner.findUnique({
+      where: { id: ownerId },
+      select: {
+        id: true,
+        microsoftAccessToken: true,
+        microsoftRefreshToken: true,
+        microsoftExpiresAt: true,
+      },
     });
 
-    if (!microsoftAuth) {
+    if (!owner || !owner.microsoftAccessToken) {
       throw new Error('Microsoft account not connected');
     }
 
     // Check if token is expired (with 5 minute buffer)
     const now = new Date();
-    const expiresAt = new Date(microsoftAuth.expiresAt);
+    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
     const bufferTime = 5 * 60 * 1000; // 5 minutes
 
-    if (expiresAt.getTime() - now.getTime() < bufferTime) {
+    if (!expiresAt || (expiresAt.getTime() - now.getTime() < bufferTime)) {
       // Token is expired or about to expire, refresh it
       console.log('Token expired or expiring soon, refreshing...');
       return await refreshAccessToken(ownerId);
     }
 
-    return microsoftAuth.accessToken;
+    return owner.microsoftAccessToken;
   } catch (error) {
     console.error('Error getting valid access token:', error);
     throw error;
@@ -46,15 +52,21 @@ export async function getValidAccessToken(ownerId) {
  */
 export async function refreshAccessToken(ownerId) {
   try {
-    const microsoftAuth = await prisma.microsoftAuth.findUnique({
-      where: { ownerId },
+    const owner = await prisma.owner.findUnique({
+      where: { id: ownerId },
+      select: {
+        id: true,
+        microsoftAccessToken: true,
+        microsoftRefreshToken: true,
+        microsoftExpiresAt: true,
+      },
     });
 
-    if (!microsoftAuth) {
+    if (!owner || !owner.microsoftAccessToken) {
       throw new Error('Microsoft account not connected');
     }
 
-    if (!microsoftAuth.refreshToken) {
+    if (!owner.microsoftRefreshToken) {
       throw new Error('No refresh token available. Please reconnect your Microsoft account.');
     }
 
@@ -71,7 +83,7 @@ export async function refreshAccessToken(ownerId) {
 
     // Refresh the token
     const tokenResponse = await cca.acquireTokenByRefreshToken({
-      refreshToken: microsoftAuth.refreshToken,
+      refreshToken: owner.microsoftRefreshToken,
       scopes: ['https://graph.microsoft.com/.default', 'offline_access'],
     });
 
@@ -82,13 +94,13 @@ export async function refreshAccessToken(ownerId) {
     // Calculate new expiration
     const expiresAt = new Date(Date.now() + (tokenResponse.expiresIn || 3600) * 1000);
 
-    // Update tokens in database
-    await prisma.microsoftAuth.update({
-      where: { ownerId },
+    // Update tokens directly on Owner model
+    await prisma.owner.update({
+      where: { id: ownerId },
       data: {
-        accessToken: tokenResponse.accessToken,
-        refreshToken: tokenResponse.refreshToken || microsoftAuth.refreshToken,
-        expiresAt,
+        microsoftAccessToken: tokenResponse.accessToken,
+        microsoftRefreshToken: tokenResponse.refreshToken || owner.microsoftRefreshToken,
+        microsoftExpiresAt: expiresAt,
       },
     });
 
@@ -279,20 +291,26 @@ export async function getCalendarEvents(ownerId, options = {}) {
  */
 export async function isMicrosoftConnected(ownerId) {
   try {
-    const microsoftAuth = await prisma.microsoftAuth.findUnique({
-      where: { ownerId },
+    const owner = await prisma.owner.findUnique({
+      where: { id: ownerId },
+      select: {
+        id: true,
+        microsoftAccessToken: true,
+        microsoftRefreshToken: true,
+        microsoftExpiresAt: true,
+      },
     });
 
-    if (!microsoftAuth) {
+    if (!owner || !owner.microsoftAccessToken) {
       return false;
     }
 
     // Check if token is expired
     const now = new Date();
-    const expiresAt = new Date(microsoftAuth.expiresAt);
+    const expiresAt = owner.microsoftExpiresAt ? new Date(owner.microsoftExpiresAt) : null;
 
     // If expired, try to refresh
-    if (expiresAt < now) {
+    if (!expiresAt || expiresAt < now) {
       try {
         await refreshAccessToken(ownerId);
         return true;
