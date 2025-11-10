@@ -377,54 +377,46 @@ export default function GrowthDashboardPage() {
         </h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <button
-            onClick={() =>
-              router.push(
-                hasCompany && dashboardMetrics.contactCount > 0
-                  ? '/contacts'
-                  : '/contacts/upload',
-              )
-            }
+            onClick={() => router.push('/contacts/upload')}
             className="group flex items-center gap-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500 transition-transform group-hover:scale-110">
               <Plus className="h-6 w-6 text-white" />
             </div>
             <div>
-              <div className="font-semibold text-gray-900">Add Contact</div>
+              <div className="font-semibold text-gray-900">Upload Contacts</div>
               <div className="text-sm text-gray-600">
-                {hasCompany && dashboardMetrics.contactCount > 0
-                  ? 'View and manage your contacts'
-                  : 'Add your first contact'}
+                Import a CSV or add contacts manually in one place.
               </div>
             </div>
           </button>
 
           <button
-            onClick={() => router.push('/contacts/view')}
+            onClick={() => router.push('/contacts')}
             className="group flex items-center gap-4 rounded-lg border-2 border-purple-200 bg-purple-50 p-4 text-left transition hover:border-purple-300 hover:bg-purple-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500 transition-transform group-hover:scale-110">
               <Filter className="h-6 w-6 text-white" />
             </div>
             <div>
-              <div className="font-semibold text-gray-900">View Contacts</div>
+              <div className="font-semibold text-gray-900">People Hub</div>
               <div className="text-sm text-gray-600">
-                View and manage your contact pipeline
+                Manage contacts, lists, companies, and pipelines.
               </div>
             </div>
           </button>
 
           <button
-            onClick={() => router.push('/outreach')}
+            onClick={() => router.push('/contacts/list-manager')}
             className="group flex items-center gap-4 rounded-lg border-2 border-green-200 bg-green-50 p-4 text-left transition hover:border-green-300 hover:bg-green-100"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500 transition-transform group-hover:scale-110">
               <Mail className="h-6 w-6 text-white" />
             </div>
             <div>
-              <div className="font-semibold text-gray-900">Send Email</div>
+              <div className="font-semibold text-gray-900">Contact Lists</div>
               <div className="text-sm text-gray-600">
-                Send an email to your contacts
+                Build and organize segments for outreach.
               </div>
             </div>
           </button>
