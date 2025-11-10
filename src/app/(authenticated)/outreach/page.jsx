@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Mail,
@@ -16,7 +16,56 @@ import PageHeader from '@/components/PageHeader.jsx';
 import { useOutreachContext } from './layout.jsx';
 import api from '@/lib/api';
 
-export default function OutreachDashboardPage() {
+// Component that uses useSearchParams - needs to be separate for Suspense
+function TargetBanner({ targetContact, targetProduct, router }) {
+  if (!targetContact && !targetProduct) {
+    return null;
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+      <div className="flex items-start gap-3">
+        <Target className="h-5 w-5 mt-0.5 text-blue-600" />
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">
+            Targeting from BD Intelligence
+          </h3>
+          <div className="space-y-1 text-sm text-gray-700">
+            {targetContact && (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>
+                  <strong>Contact:</strong>{' '}
+                  {targetContact.goesBy ||
+                    [targetContact.firstName, targetContact.lastName]
+                      .filter(Boolean)
+                      .join(' ') ||
+                    targetContact.email ||
+                    'Unknown'}
+                  {targetContact.title && ` - ${targetContact.title}`}
+                </span>
+              </div>
+            )}
+            {targetProduct && (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>
+                  <strong>Product:</strong> {targetProduct.name}
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            Create a campaign to start targeting with hunter.io integration
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Component that handles search params
+function OutreachContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { campaigns, hydrating } = useOutreachContext();
@@ -109,46 +158,11 @@ export default function OutreachDashboardPage() {
         />
 
         {/* Target Info Banner */}
-        {(targetContact || targetProduct) && (
-          <div className="mb-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
-            <div className="flex items-start gap-3">
-              <Target className="h-5 w-5 mt-0.5 text-blue-600" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                  Targeting from BD Intelligence
-                </h3>
-                <div className="space-y-1 text-sm text-gray-700">
-                  {targetContact && (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>
-                        <strong>Contact:</strong>{' '}
-                        {targetContact.goesBy ||
-                          [targetContact.firstName, targetContact.lastName]
-                            .filter(Boolean)
-                            .join(' ') ||
-                          targetContact.email ||
-                          'Unknown'}
-                        {targetContact.title && ` - ${targetContact.title}`}
-                      </span>
-                    </div>
-                  )}
-                  {targetProduct && (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span>
-                        <strong>Product:</strong> {targetProduct.name}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-gray-600">
-                  Create a campaign to start targeting with hunter.io integration
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        <TargetBanner 
+          targetContact={targetContact}
+          targetProduct={targetProduct}
+          router={router}
+        />
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
           <MetricCard
@@ -259,6 +273,27 @@ export default function OutreachDashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component wrapped in Suspense
+export default function OutreachDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Outreach Dashboard"
+            subtitle="Launch nurture campaigns and track engagement performance."
+          />
+          <div className="flex items-center justify-center py-12">
+            <div className="text-sm text-gray-500">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <OutreachContent />
+    </Suspense>
   );
 }
 

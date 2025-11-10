@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Owner {
-  id                String         @id @default(cuid())
-  firebaseId        String         @unique
-  name              String?
-  email             String?
-  photoURL          String?
-  teamSize          String?        // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  managedCompanies  CompanyHQ[]    @relation("ManagerOf")
-  ownedCompanies    CompanyHQ[]    @relation("OwnerOf")
-  microsoftAuth     MicrosoftAuth?
+  id               String         @id @default(cuid())
+  firebaseId       String         @unique
+  name             String?
+  email            String?
+  photoURL         String?
+  teamSize         String? // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  managedCompanies CompanyHQ[]    @relation("ManagerOf")
+  ownedCompanies   CompanyHQ[]    @relation("OwnerOf")
+  microsoftAuth    MicrosoftAuth?
 
   @@map("owners")
 }
@@ -26,15 +26,15 @@ model Owner {
 model CompanyHQ {
   id               String        @id @default(cuid())
   companyName      String
-  companyStreet    String?       // Street address
-  companyCity      String?       // City
-  companyState     String?       // State
-  companyWebsite   String?       // Website URL (for LinkedIn extraction, etc.)
-  whatYouDo        String?       // What the company does (description)
+  companyStreet    String? // Street address
+  companyCity      String? // City
+  companyState     String? // State
+  companyWebsite   String? // Website URL (for LinkedIn extraction, etc.)
+  whatYouDo        String? // What the company does (description)
   companyIndustry  String?
   companyAnnualRev Float?
   yearsInBusiness  Int?
-  teamSize         String?       // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+  teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   ownerId          String
@@ -52,20 +52,20 @@ model CompanyHQ {
 }
 
 model Company {
-  id              String    @id @default(cuid())
+  id              String     @id @default(cuid())
   companyHQId     String
   companyName     String
   address         String?
   industry        String?
-  website         String?   // Website URL (inferred from email domain or manually entered)
+  website         String? // Website URL (inferred from email domain or manually entered)
   revenue         Float?
   yearsInBusiness Int?
   proposalId      String?
   contractId      String?
   invoiceId       String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  companyHQ       CompanyHQ  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   contacts        Contact[]
   proposals       Proposal[] // Reverse relation - proposals linked to this company
 
@@ -88,17 +88,17 @@ model ContactList {
 
 model Contact {
   id               String       @id @default(cuid())
-  crmId            String       // CompanyHQId (tenant identifier) - renamed from companyId for clarity
+  crmId            String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
   firstName        String?
   lastName         String?
   goesBy           String?
   email            String?
   phone            String?
   title            String?
-  contactCompanyId String?      // Company they work for (prospect/client company)
+  contactCompanyId String? // Company they work for (prospect/client company)
   buyerDecision    String?
   howMet           String?
-  notes            String?      // Notes/context about the contact
+  notes            String? // Notes/context about the contact
   contactListId    String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -137,33 +137,33 @@ model Pipeline {
 }
 
 model Proposal {
-  id              String    @id @default(cuid())
-  companyHQId     String    // Multi-tenancy - scoped to CompanyHQ
-  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  
+  id          String    @id @default(cuid())
+  companyHQId String // Multi-tenancy - scoped to CompanyHQ
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
   // Client information
-  clientName        String
-  clientCompany   String    // Company name (can link to Company model later via companyId)
-  companyId       String?   // Optional: Link to Company model (prospect/client company)
-  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  
+  clientName    String
+  clientCompany String // Company name (can link to Company model later via companyId)
+  companyId     String? // Optional: Link to Company model (prospect/client company)
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
   // Proposal details
-  purpose         String?   // Purpose/description of the proposal
-  status          String    @default("draft") // "draft" | "active" | "approved" | "rejected"
-  totalPrice      Float?    // Total price of all services
-  
+  purpose    String? // Purpose/description of the proposal
+  status     String  @default("draft") // "draft" | "active" | "approved" | "rejected"
+  totalPrice Float? // Total price of all services
+
   // Proposal structure (stored as JSON for flexibility)
-  serviceInstances Json?    // Array of ProposalServiceInstance (from ProposalBuilder)
-  phases           Json?    // Array of Phase objects (with deliverables, activities, kpis)
-  milestones       Json?    // Array of Milestone objects (week, label, completed)
-  compensation     Json?    // Compensation object (total, currency, breakdown, paymentSchedule)
-  
+  serviceInstances Json? // Array of ProposalServiceInstance (from ProposalBuilder)
+  phases           Json? // Array of Phase objects (with deliverables, activities, kpis)
+  milestones       Json? // Array of Milestone objects (week, label, completed)
+  compensation     Json? // Compensation object (total, currency, breakdown, paymentSchedule)
+
   // Metadata
-  dateIssued      DateTime? // Date proposal was issued
-  preparedBy      String?   // Who prepared the proposal
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  dateIssued DateTime? // Date proposal was issued
+  preparedBy String? // Who prepared the proposal
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("proposals")
 }
@@ -195,7 +195,7 @@ model MicrosoftAuth {
   accessToken  String
   refreshToken String
   expiresAt    DateTime
-  email        String?  // Store Microsoft account email for display
+  email        String? // Store Microsoft account email for display
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   owner        Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)

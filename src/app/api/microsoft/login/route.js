@@ -42,10 +42,11 @@ export async function GET(request) {
     const encodedState = Buffer.from(JSON.stringify(stateData)).toString('base64url');
 
     // Build OAuth URL
+    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'https://ignitegrowth.biz/api/microsoft/callback';
     const params = new URLSearchParams({
       client_id: process.env.AZURE_CLIENT_ID,
       response_type: 'code',
-      redirect_uri: process.env.MICROSOFT_REDIRECT_URI || `${process.env.APP_URL}/api/microsoft/callback`,
+      redirect_uri: redirectUri,
       response_mode: 'query',
       scope: 'https://graph.microsoft.com/.default offline_access',
       state: encodedState,
