@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, Mail, Plug2, ArrowRight, User, Building2, Save, ChevronRight } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { owner, ownerId, companyHQ, companyHQId, refresh: refreshOwner } = useOwner();
   const [microsoftAuth, setMicrosoftAuth] = useState(null);
+  const [sendGridConfig, setSendGridConfig] = useState(null);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState(null); // 'profile' | 'company' | 'integrations' | null
   
@@ -65,11 +66,12 @@ export default function SettingsPage() {
     // Fetch Microsoft integration status (checks by ownerId via API)
     if (ownerId) {
       fetchConnectionStatus();
+      fetchSendGridConfig();
     }
-  }, [owner, companyHQ, ownerId]);
+  }, [owner, companyHQ, ownerId, fetchConnectionStatus, fetchSendGridConfig]);
 
   // Fetch Microsoft connection status (non-blocking)
-  const fetchConnectionStatus = async () => {
+  const fetchConnectionStatus = useCallback(async () => {
     try {
       const response = await api.get('/api/microsoft/status');
       if (response.data.success) {
@@ -79,7 +81,20 @@ export default function SettingsPage() {
       // Not an error if not connected
       setMicrosoftAuth(null);
     }
-  };
+  }, []);
+
+  // Fetch SendGrid configuration (non-blocking)
+  const fetchSendGridConfig = useCallback(async () => {
+    try {
+      const response = await api.get('/api/email/config');
+      if (response.data.success) {
+        setSendGridConfig(response.data);
+      }
+    } catch (err) {
+      // Not an error if not configured
+      setSendGridConfig({ configured: false });
+    }
+  }, []);
 
   // Handle Microsoft connection
   const handleConnectMicrosoft = async () => {
@@ -440,18 +455,41 @@ export default function SettingsPage() {
                       </p>
                       
                       <div className="space-y-3">
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm font-medium text-blue-900 mb-1">
-                            Status: {process.env.NEXT_PUBLIC_SENDGRID_CONFIGURED ? 'Configured' : 'Not Configured'}
-                          </p>
-                          <p className="text-xs text-blue-700">
-                            SendGrid is configured server-side. Emails will be sent from: {process.env.NEXT_PUBLIC_SENDGRID_FROM_EMAIL || 'noreply@ignitegrowth.biz'}
-                          </p>
-                        </div>
-                        <div className="text-xs text-gray-500">
+                        {sendGridConfig ? (
+                          <div className={`p-3 border rounded-lg ${
+                            sendGridConfig.configured 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-yellow-50 border-yellow-200'
+                          }`}>
+                            <p className={`text-sm font-medium mb-1 ${
+                              sendGridConfig.configured 
+                                ? 'text-green-900' 
+                                : 'text-yellow-900'
+                            }`}>
+                              Status: {sendGridConfig.configured ? 'Configured' : 'Not Configured'}
+                            </p>
+                            {sendGridConfig.configured ? (
+                              <p className="text-xs text-green-700">
+                                Emails will be sent from: {sendGridConfig.fromName} &lt;{sendGridConfig.fromEmail}&gt;
+                              </p>
+                            ) : (
+                              <p className="text-xs text-yellow-700">
+                                Configure SENDGRID_API_KEY in your environment variables to enable email sending.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 mb-1">
+                              Loading configuration...
+                            </p>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 space-y-1">
                           <p>• Configure SENDGRID_API_KEY in your environment variables</p>
                           <p>• Set SENDGRID_FROM_EMAIL and SENDGRID_FROM_NAME for sender info</p>
                           <p>• No user authentication required - works immediately</p>
+                          <p>• Better for outreach campaigns than personal email APIs</p>
                         </div>
                       </div>
                     </div>
