@@ -21,6 +21,7 @@ model Owner {
   microsoftExpiresAt    DateTime? // Token expiration timestamp
   microsoftEmail        String? // Microsoft account email (for display)
   microsoftDisplayName  String? // Microsoft account display name (for display)
+  microsoftTenantId     String? // Tenant ID extracted from ID token (for tenant-specific token refresh)
 
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

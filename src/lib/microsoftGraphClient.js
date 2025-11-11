@@ -87,9 +87,10 @@ export async function refreshAccessToken(ownerId) {
     const cca = new ConfidentialClientApplication(msalConfig);
 
     // Refresh the token
+    // Use the same scopes as the initial authorization
     const tokenResponse = await cca.acquireTokenByRefreshToken({
       refreshToken: owner.microsoftRefreshToken,
-      scopes: ['https://graph.microsoft.com/.default', 'offline_access'],
+      scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Send', 'Mail.Read', 'Contacts.Read', 'Contacts.ReadWrite', 'Calendars.Read'],
     });
 
     if (!tokenResponse || !tokenResponse.accessToken) {
