@@ -8,24 +8,24 @@ datasource db {
 }
 
 model Owner {
-  id               String         @id @default(cuid())
-  firebaseId       String         @unique
-  name             String?
-  email            String?
-  photoURL         String?
-  teamSize         String? // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  
+  id         String  @id @default(cuid())
+  firebaseId String  @unique
+  name       String?
+  email      String?
+  photoURL   String?
+  teamSize   String? // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
+
   // Microsoft OAuth integration (bolted directly onto Owner)
-  microsoftAccessToken  String?  // Microsoft Graph access token
-  microsoftRefreshToken String?  // Refresh token for getting new access tokens
+  microsoftAccessToken  String? // Microsoft Graph access token
+  microsoftRefreshToken String? // Refresh token for getting new access tokens
   microsoftExpiresAt    DateTime? // Token expiration timestamp
-  microsoftEmail        String?  // Microsoft account email (for display)
-  microsoftDisplayName  String?  // Microsoft account display name (for display)
-  
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  managedCompanies CompanyHQ[]    @relation("ManagerOf")
-  ownedCompanies   CompanyHQ[]    @relation("OwnerOf")
+  microsoftEmail        String? // Microsoft account email (for display)
+  microsoftDisplayName  String? // Microsoft account display name (for display)
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  managedCompanies CompanyHQ[] @relation("ManagerOf")
+  ownedCompanies   CompanyHQ[] @relation("OwnerOf")
 
   @@map("owners")
 }
@@ -205,4 +205,3 @@ model Persona {
 
   @@map("personas")
 }
-
