@@ -23,12 +23,34 @@ model Owner {
   microsoftDisplayName  String? // Microsoft account display name (for display)
   microsoftTenantId     String? // Tenant ID extracted from ID token (for tenant-specific token refresh)
 
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  managedCompanies CompanyHQ[] @relation("ManagerOf")
-  ownedCompanies   CompanyHQ[] @relation("OwnerOf")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  managedCompanies CompanyHQ[]     @relation("ManagerOf")
+  ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
+  emailActivities  EmailActivity[] // Outreach email tracking
 
   @@map("owners")
+}
+
+model EmailActivity {
+  id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
+  contactId String?  @map("contact_id")
+  tenantId  String?  @map("tenant_id")
+  email     String
+  subject   String
+  body      String
+  event     String? // last known state: delivered, opened, clicked, bounced, etc.
+  messageId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner Owner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([messageId])
+  @@index([contactId])
+  @@map("email_activities")
 }
 
 model CompanyHQ {
