@@ -52,6 +52,11 @@ const navigationGroups = [
     name: 'Nurture',
     items: [
       { name: 'People Hub', path: '/contacts', icon: Users },
+    ],
+  },
+  {
+    name: 'Client Operations',
+    items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
