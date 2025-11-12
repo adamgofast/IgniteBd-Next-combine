@@ -129,7 +129,11 @@ export async function POST(request, { params }) {
               }
 
               // Generate password reset link
-              const resetLink = await auth.generatePasswordResetLink(primaryContact.email);
+              const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001';
+              const resetLink = await auth.generatePasswordResetLink(primaryContact.email, {
+                url: `${clientPortalUrl}/login`, // Redirect to our client portal login after password is set
+                handleCodeInApp: false, // Use Firebase's hosted page (not our custom handler)
+              });
               
               // Store Firebase UID in Contact notes
               const existingNotes = primaryContact.notes ? JSON.parse(primaryContact.notes) : {};

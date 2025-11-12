@@ -78,8 +78,12 @@ export async function POST(request, { params }) {
       }
 
       // Generate password reset link - Firebase handles this!
-      // Client clicks link → Sets their own password → Can log in
-      const resetLink = await auth.generatePasswordResetLink(contact.email);
+      // Client clicks link → Sets their own password → Redirects to our client portal
+      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001';
+      const resetLink = await auth.generatePasswordResetLink(contact.email, {
+        url: `${clientPortalUrl}/login`, // Redirect to our client portal login after password is set
+        handleCodeInApp: false, // Use Firebase's hosted page (not our custom handler)
+      });
       
       // Store Firebase UID in Contact (link Contact to Firebase user)
       const existingNotes = contact.notes ? JSON.parse(contact.notes) : {};

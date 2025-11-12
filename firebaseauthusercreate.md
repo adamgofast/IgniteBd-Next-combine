@@ -99,12 +99,15 @@ const resetLink = await auth.generatePasswordResetLink(contact.email);
 
 **Critical: How It Works Even Without a Password**
 - Firebase's `generatePasswordResetLink` works **even when the user has NO password set**
-- When the client clicks the link, Firebase takes them to a page where they **SET their password for the first time**
+- When the client clicks the link, Firebase takes them to **Firebase's hosted password reset page** (not our client portal)
 - It's not really a "reset" - it's more like a "set your initial password" link
 - The client doesn't need to know any existing password because **there isn't one**
 - Firebase uses the `oobCode` (out-of-band code) in the URL to verify the request is legitimate
 - The link is time-limited and expires after a set time (Firebase default)
+- After setting their password, Firebase redirects them to our client portal login page (via `continueUrl`)
 - Once they set their password via the link, they can then log in normally with email + password
+
+**Important:** The password setup happens on Firebase's page, NOT our client portal. After they set it, they're redirected to our portal login.
 
 ### 6. Store Firebase UID in Database (Server-Side)
 
@@ -177,12 +180,13 @@ return NextResponse.json({
 
 **The Flow:**
 1. We create Firebase user **WITHOUT a password** (passwordless state)
-2. We generate a password reset link (works even without a password)
-3. Client clicks the link → Firebase takes them to a page
+2. We generate a password reset link with `continueUrl` pointing to our client portal login
+3. Client clicks the link → Firebase takes them to **Firebase's hosted password reset page** (not our portal)
 4. Client enters a NEW password (no "old password" field because there isn't one)
 5. Firebase validates the `oobCode` in the URL to ensure it's legitimate
 6. Client's password is now set
-7. Client can now log in normally with email + password
+7. Firebase redirects them to our client portal login page (`/login`)
+8. Client can now log in normally with email + password on our client portal
 
 **Key Point:** Firebase's `generatePasswordResetLink` works for BOTH:
 - Users who have a password (actual reset)
