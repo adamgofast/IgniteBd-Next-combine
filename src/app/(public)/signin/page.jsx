@@ -41,7 +41,7 @@ export default function SigninPage() {
     setIsSigningIn(true);
     try {
       const result = await signInWithGoogle();
-      const user = await createOrFindUser({
+      const owner = await createOrFindOwner({
         firebaseId: result.uid,
         email: result.email,
         firstName: result.name?.split(' ')[0] || '',
@@ -49,7 +49,7 @@ export default function SigninPage() {
         photoURL: result.photoURL,
       });
 
-      await persistSession(result, user);
+      await persistSession(result, owner);
       router.push('/owner-identity-survey');
     } catch (error) {
       console.error('Google sign-in failed:', error);
@@ -66,7 +66,7 @@ export default function SigninPage() {
     setIsSigningIn(true);
     try {
       const result = await signInWithEmail(emailData.email, emailData.password);
-      const user = await createOrFindUser({
+      const owner = await createOrFindOwner({
         firebaseId: result.uid,
         email: result.email,
         firstName: result.name?.split(' ')[0] || '',
@@ -74,7 +74,7 @@ export default function SigninPage() {
         photoURL: result.photoURL,
       });
 
-      await persistSession(result, user);
+      await persistSession(result, owner);
       router.push('/owner-identity-survey');
     } catch (error) {
       console.error('Email sign-in failed:', error);
