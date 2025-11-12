@@ -15,6 +15,7 @@ import {
   Package,
   BarChart,
   Palette,
+  Rocket,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -57,6 +58,7 @@ const navigationGroups = [
   {
     name: 'Client Operations',
     items: [
+      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket },
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
     ],
