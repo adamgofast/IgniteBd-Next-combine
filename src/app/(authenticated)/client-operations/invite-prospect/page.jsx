@@ -6,36 +6,9 @@ import { Search, Mail, User, CheckCircle, Copy, Send, RefreshCw } from 'lucide-r
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
 
-// Try to use ContactsContext if available, but don't fail if not
-let useContactsContext;
-try {
-  const contactsLayout = require('@/app/(authenticated)/contacts/layout');
-  useContactsContext = contactsLayout.useContactsContext;
-} catch (e) {
-  // Contacts layout not available - we'll use localStorage directly
-  useContactsContext = null;
-}
-
 export default function InviteProspectPage() {
   const router = useRouter();
-  
-  // Try to use ContactsContext if available
-  let contextContacts = [];
-  let contextHydrated = false;
-  let refreshContextContacts = null;
-  
-  try {
-    if (useContactsContext) {
-      const context = useContactsContext();
-      contextContacts = context.contacts || [];
-      contextHydrated = context.hydrated || false;
-      refreshContextContacts = context.refreshContacts;
-    }
-  } catch (e) {
-    // Not within ContactsLayout - that's fine, we'll use localStorage
-  }
-
-  const [contacts, setContacts] = useState(contextContacts);
+  const [contacts, setContacts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -55,29 +28,23 @@ export default function InviteProspectPage() {
     setCompanyHQId(storedCompanyHQId);
   }, []);
 
-  // Load contacts - prefer context, fallback to localStorage
+  // Load contacts from localStorage on mount
   useEffect(() => {
-    if (contextHydrated && contextContacts.length > 0) {
-      // Use contacts from context
-      setContacts(contextContacts);
-      return;
-    }
-
-    // Fallback to localStorage
     if (typeof window === 'undefined') return;
     
     const cachedContacts = window.localStorage.getItem('contacts');
     if (cachedContacts) {
       try {
         const parsed = JSON.parse(cachedContacts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           setContacts(parsed);
         }
       } catch (err) {
         console.warn('Failed to parse cached contacts', err);
+        setContacts([]);
       }
     }
-  }, [contextContacts, contextHydrated]);
+  }, []);
 
   // Fetch contacts from API if needed
   const fetchContactsFromAPI = useCallback(async () => {
@@ -109,15 +76,8 @@ export default function InviteProspectPage() {
     }
   }, [companyHQId]);
 
-  // Refresh contacts - try context first, then localStorage
-  const refreshContacts = useCallback(async () => {
-    // If we have context refresh, use it
-    if (refreshContextContacts) {
-      await refreshContextContacts();
-      return;
-    }
-
-    // Otherwise refresh from localStorage
+  // Refresh from localStorage
+  const refreshContacts = useCallback(() => {
     if (typeof window === 'undefined') return;
     
     const cachedContacts = window.localStorage.getItem('contacts');
@@ -131,7 +91,7 @@ export default function InviteProspectPage() {
         console.warn('Failed to parse cached contacts', err);
       }
     }
-  }, [refreshContextContacts]);
+  }, []);
 
   // Filter contacts by search term and ensure they have email
   const availableContacts = useMemo(() => {
