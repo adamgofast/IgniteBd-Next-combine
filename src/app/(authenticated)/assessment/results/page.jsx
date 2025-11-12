@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle2, TrendingUp, ArrowLeft, Sparkles } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader.jsx';
 
-export default function AssessmentResultsPage() {
+function AssessmentResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get('id');
@@ -233,6 +233,18 @@ export default function AssessmentResultsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AssessmentResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    }>
+      <AssessmentResultsContent />
+    </Suspense>
   );
 }
 

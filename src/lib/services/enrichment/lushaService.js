@@ -1,4 +1,5 @@
-import { Redis } from '@upstash/redis';
+// TEMPORARILY DISABLED: Redis/Upstash commented out for deployment
+// import { Redis } from '@upstash/redis';
 import { prisma } from '@/lib/prisma';
 
 const BASE_URL = 'https://api.lusha.com/prospecting';
@@ -11,21 +12,54 @@ function getHeaders() {
   return { api_key: apiKey };
 }
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+// TEMPORARILY DISABLED: Redis initialization commented out
+// Lazy Redis initialization to prevent build-time errors
+// let redis = null;
+
+// function getRedis() {
+//   if (redis) {
+//     return redis;
+//   }
+
+//   const url = process.env.UPSTASH_REDIS_REST_URL;
+//   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+//   if (!url || !token) {
+//     throw new Error(
+//       'Redis configuration is missing. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables.'
+//     );
+//   }
+
+//   redis = new Redis({
+//     url,
+//     token,
+//   });
+
+//   return redis;
+// }
+
+// Temporary function to indicate Redis is disabled
+function getRedis() {
+  throw new Error('Redis is temporarily disabled');
+}
 
 /**
  * Enqueue a candidate for enrichment
  * @param {Object} candidate - Candidate object with id, firstName, lastName, companyName, etc.
  * @returns {Promise<string>} Job ID
+ * 
+ * TEMPORARILY DISABLED: Redis is commented out
  */
 export async function enqueueCandidate(candidate) {
-  const jobId = `lusha:job:${candidate.id}`;
-  await redis.hset(jobId, { ...candidate, status: 'pending' });
-  await redis.expire(jobId, 3600); // 1 hour TTL
-  return jobId;
+  // TEMPORARILY DISABLED: Redis functionality
+  // const redisClient = getRedis();
+  // const jobId = `lusha:job:${candidate.id}`;
+  // await redisClient.hset(jobId, { ...candidate, status: 'pending' });
+  // await redisClient.expire(jobId, 3600); // 1 hour TTL
+  // return jobId;
+  
+  console.warn('⚠️ Redis is temporarily disabled. Enqueue functionality is not available.');
+  throw new Error('Redis is temporarily disabled. Enqueue functionality is not available.');
 }
 
 /**
@@ -101,99 +135,112 @@ async function enrichByNameAndCompany(firstName, lastName, companyName) {
 /**
  * Process the enrichment queue
  * Processes all pending jobs in Redis and enriches contacts
+ * 
+ * TEMPORARILY DISABLED: Redis is commented out
  */
 export async function processQueue() {
-  const keys = await redis.keys('lusha:job:*');
-  const results = {
+  // TEMPORARILY DISABLED: Redis functionality
+  // const redisClient = getRedis();
+  // const keys = await redisClient.keys('lusha:job:*');
+  // const results = {
+  //   processed: 0,
+  //   succeeded: 0,
+  //   failed: 0,
+  //   errors: [],
+  // };
+
+  // for (const key of keys) {
+  //   try {
+  //     const job = await redisClient.hgetall(key);
+  //     if (job.status === 'pending') {
+  //       results.processed++;
+
+  //       try {
+  //         const result = await enrichByNameAndCompany(
+  //           job.firstName,
+  //           job.lastName,
+  //           job.companyName
+  //         );
+
+  //         if (result) {
+  //           // Extract email from enrichment payload
+  //           const email = result.email || result.emails?.[0]?.email;
+  //           const domain = result.domain || (email ? email.split('@')[1] : null);
+  //           const enrichedCompanyName = result.companyName || result.companies?.[0]?.name || job.companyName;
+
+  //           // Only persist if we have an email (verified contact)
+  //           if (email) {
+  //             // Check if contact already exists
+  //             const existingContact = await prisma.contact.findFirst({
+  //               where: { email },
+  //             });
+
+  //             const contactData = {
+  //               enrichmentSource: 'Lusha',
+  //               enrichmentFetchedAt: new Date(),
+  //               enrichmentPayload: result,
+  //               firstName: result.firstName || job.firstName,
+  //               lastName: result.lastName || job.lastName,
+  //               email,
+  //               domain,
+  //               companyName: enrichedCompanyName,
+  //               title: result.title || result.jobTitle,
+  //               phone: result.phone || result.phones?.[0]?.phone,
+  //             };
+
+  //             if (existingContact) {
+  //               // Update existing contact
+  //               await prisma.contact.update({
+  //                 where: { id: existingContact.id },
+  //                 data: contactData,
+  //               });
+  //             } else {
+  //               // Create new contact
+  //               await prisma.contact.create({
+  //                 data: {
+  //                   ...contactData,
+  //                   crmId: job.crmId || job.companyHQId || '', // Required field
+  //                   createdById: job.userId,
+  //                 },
+  //               });
+  //             }
+
+  //             await redisClient.hset(key, { status: 'done' });
+  //             results.succeeded++;
+  //             console.log(`✅ Enriched contact: ${email}`);
+  //           } else {
+  //             await redisClient.hset(key, { status: 'failed', error: 'No email found in enrichment result' });
+  //             results.failed++;
+  //             console.log(`⚠️ No email found for: ${job.firstName} ${job.lastName} at ${job.companyName}`);
+  //           }
+  //         } else {
+  //           await redisClient.hset(key, { status: 'failed', error: 'No enrichment result' });
+  //           results.failed++;
+  //           console.log(`⚠️ No enrichment result for: ${job.firstName} ${job.lastName} at ${job.companyName}`);
+  //         }
+  //       } catch (err) {
+  //         const errorMsg = String(err);
+  //         await redisClient.hset(key, { status: 'error', error: errorMsg });
+  //         results.failed++;
+  //         results.errors.push({ key, error: errorMsg });
+  //         console.error(`❌ Error processing job ${key}:`, err);
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error(`❌ Error reading job ${key}:`, err);
+  //     results.errors.push({ key, error: String(err) });
+  //   }
+  // }
+
+  // return results;
+  
+  console.warn('⚠️ Redis is temporarily disabled. Queue processing is not available.');
+  return {
     processed: 0,
     succeeded: 0,
     failed: 0,
     errors: [],
+    message: 'Redis is temporarily disabled',
   };
-
-  for (const key of keys) {
-    try {
-      const job = await redis.hgetall(key);
-      if (job.status === 'pending') {
-        results.processed++;
-
-        try {
-          const result = await enrichByNameAndCompany(
-            job.firstName,
-            job.lastName,
-            job.companyName
-          );
-
-          if (result) {
-            // Extract email from enrichment payload
-            const email = result.email || result.emails?.[0]?.email;
-            const domain = result.domain || (email ? email.split('@')[1] : null);
-            const enrichedCompanyName = result.companyName || result.companies?.[0]?.name || job.companyName;
-
-            // Only persist if we have an email (verified contact)
-            if (email) {
-              // Check if contact already exists
-              const existingContact = await prisma.contact.findFirst({
-                where: { email },
-              });
-
-              const contactData = {
-                enrichmentSource: 'Lusha',
-                enrichmentFetchedAt: new Date(),
-                enrichmentPayload: result,
-                firstName: result.firstName || job.firstName,
-                lastName: result.lastName || job.lastName,
-                email,
-                domain,
-                companyName: enrichedCompanyName,
-                title: result.title || result.jobTitle,
-                phone: result.phone || result.phones?.[0]?.phone,
-              };
-
-              if (existingContact) {
-                // Update existing contact
-                await prisma.contact.update({
-                  where: { id: existingContact.id },
-                  data: contactData,
-                });
-              } else {
-                // Create new contact
-                await prisma.contact.create({
-                  data: {
-                    ...contactData,
-                    crmId: job.crmId || job.companyHQId || '', // Required field
-                    createdById: job.userId,
-                  },
-                });
-              }
-
-              await redis.hset(key, { status: 'done' });
-              results.succeeded++;
-              console.log(`✅ Enriched contact: ${email}`);
-            } else {
-              await redis.hset(key, { status: 'failed', error: 'No email found in enrichment result' });
-              results.failed++;
-              console.log(`⚠️ No email found for: ${job.firstName} ${job.lastName} at ${job.companyName}`);
-            }
-          } else {
-            await redis.hset(key, { status: 'failed', error: 'No enrichment result' });
-            results.failed++;
-            console.log(`⚠️ No enrichment result for: ${job.firstName} ${job.lastName} at ${job.companyName}`);
-          }
-        } catch (err) {
-          const errorMsg = String(err);
-          await redis.hset(key, { status: 'error', error: errorMsg });
-          results.failed++;
-          results.errors.push({ key, error: errorMsg });
-          console.error(`❌ Error processing job ${key}:`, err);
-        }
-      }
-    } catch (err) {
-      console.error(`❌ Error reading job ${key}:`, err);
-      results.errors.push({ key, error: String(err) });
-    }
-  }
-
-  return results;
 }
 
