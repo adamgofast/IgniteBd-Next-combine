@@ -128,11 +128,11 @@ export async function POST(request, { params }) {
                 });
               }
 
-              // Generate password reset link
+              // Generate password reset link - handled on our client portal page
               const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001';
               const resetLink = await auth.generatePasswordResetLink(primaryContact.email, {
-                url: `${clientPortalUrl}/login`, // Redirect to our client portal login after password is set
-                handleCodeInApp: false, // Use Firebase's hosted page (not our custom handler)
+                url: `${clientPortalUrl}/reset-password`, // Our custom password reset page
+                handleCodeInApp: true, // Handle on our page, not Firebase's hosted page
               });
               
               // Store Firebase UID in Contact notes
