@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Search, Mail, User, CheckCircle, Copy, Send, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import api from '@/lib/api';
+import { getContactsRegistry } from '@/lib/services/contactsRegistry';
 
 export default function InviteProspectPage() {
   const router = useRouter();
-  const [contacts, setContacts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -17,6 +17,7 @@ export default function InviteProspectPage() {
 
   const [companyHQId, setCompanyHQId] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [registry] = useState(() => getContactsRegistry());
 
   // Get companyHQId from localStorage
   useEffect(() => {
@@ -28,25 +29,14 @@ export default function InviteProspectPage() {
     setCompanyHQId(storedCompanyHQId);
   }, []);
 
-  // Load contacts from localStorage on mount
+  // Load contacts from registry on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const cachedContacts = window.localStorage.getItem('contacts');
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
-        }
-      } catch (err) {
-        console.warn('Failed to parse cached contacts', err);
-        setContacts([]);
-      }
+    if (!registry.hydrated) {
+      registry.loadFromCache();
     }
-  }, []);
+  }, [registry]);
 
-  // Fetch contacts from API if needed
+  // Fetch contacts from API and hydrate registry
   const fetchContactsFromAPI = useCallback(async () => {
     if (!companyHQId) {
       console.warn('No companyHQId available');
@@ -59,14 +49,11 @@ export default function InviteProspectPage() {
       const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
       if (response.data?.success && response.data.contacts) {
         const fetched = response.data.contacts;
-        console.log('Fetched contacts from API:', fetched.length);
-        setContacts(fetched);
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('contacts', JSON.stringify(fetched));
-        }
+        registry.hydrate(fetched);
+        registry.saveToCache();
       } else {
         console.warn('API response missing contacts:', response.data);
-        setContacts([]);
+        registry.clear();
       }
     } catch (err) {
       console.error('Error fetching contacts:', err);
@@ -74,38 +61,17 @@ export default function InviteProspectPage() {
     } finally {
       setLoadingContacts(false);
     }
-  }, [companyHQId]);
+  }, [companyHQId, registry]);
 
-  // Refresh from localStorage
+  // Refresh from cache
   const refreshContacts = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    
-    const cachedContacts = window.localStorage.getItem('contacts');
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
-        }
-      } catch (err) {
-        console.warn('Failed to parse cached contacts', err);
-      }
-    }
-  }, []);
+    registry.loadFromCache();
+  }, [registry]);
 
-  // Filter contacts by search term and ensure they have email
+  // Get available contacts using registry search
   const availableContacts = useMemo(() => {
-    return contacts.filter((contact) => {
-      const hasEmail = contact.email && contact.email.trim() !== '';
-      const matchesSearch =
-        !searchTerm ||
-        contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.contactCompany?.companyName?.toLowerCase().includes(searchTerm.toLowerCase());
-      return hasEmail && matchesSearch;
-    });
-  }, [contacts, searchTerm]);
+    return registry.searchWithEmail(searchTerm);
+  }, [searchTerm, registry]);
 
   const handleSelectContact = (contact) => {
     setSelectedContact(contact);
@@ -208,7 +174,7 @@ export default function InviteProspectPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
                   <p className="text-gray-500">Loading contacts...</p>
                 </div>
-              ) : contacts.length === 0 ? (
+              ) : registry.getCount() === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500 mb-4">
                     No contacts found in cache.
@@ -230,7 +196,7 @@ export default function InviteProspectPage() {
                       : 'No contacts with email addresses available'}
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Found {contacts.length} total contacts, but none have email addresses.
+                    Found {registry.getCount()} total contacts, but none have email addresses.
                   </p>
                 </div>
               ) : (
