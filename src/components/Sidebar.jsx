@@ -69,10 +69,10 @@ const navigationGroups = [
   },
   {
     name: 'Client Operations',
-    hubPath: '/client-operations',
     items: [
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Deliverables', path: '/client-operations/deliverables', icon: FileText },
+      { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket },
     ],
   },
   {
