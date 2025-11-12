@@ -9,11 +9,16 @@ import PageHeader from '@/components/PageHeader.jsx';
 function AssessmentResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const assessmentId = searchParams.get('id');
+  const [mounted, setMounted] = useState(false);
+  const assessmentId = mounted ? searchParams.get('id') : null;
   
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState(null);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!assessmentId) {
