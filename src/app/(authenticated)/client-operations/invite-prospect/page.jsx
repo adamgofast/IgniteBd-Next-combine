@@ -15,23 +15,75 @@ export default function InviteProspectPage() {
   const [inviteLink, setInviteLink] = useState(null);
   const [error, setError] = useState('');
 
+  const [companyHQId, setCompanyHQId] = useState('');
+  const [loadingContacts, setLoadingContacts] = useState(false);
+
+  // Get companyHQId from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedCompanyHQId =
+      window.localStorage.getItem('companyHQId') ||
+      window.localStorage.getItem('companyId') ||
+      '';
+    setCompanyHQId(storedCompanyHQId);
+  }, []);
+
   // Load contacts from localStorage on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const cachedContacts = window.localStorage.getItem('contacts');
+    console.log('Loading contacts from localStorage:', cachedContacts ? 'Found' : 'Not found');
+    
     if (cachedContacts) {
       try {
         const parsed = JSON.parse(cachedContacts);
+        console.log('Parsed contacts:', parsed?.length || 0, 'contacts');
         if (Array.isArray(parsed)) {
           setContacts(parsed);
+        } else {
+          console.warn('Contacts is not an array:', typeof parsed);
+          setContacts([]);
         }
       } catch (err) {
         console.warn('Failed to parse cached contacts', err);
         setContacts([]);
       }
+    } else {
+      console.log('No contacts in localStorage');
+      setContacts([]);
     }
   }, []);
+
+  // Fetch contacts from API if needed
+  const fetchContactsFromAPI = useCallback(async () => {
+    if (!companyHQId) {
+      console.warn('No companyHQId available');
+      return;
+    }
+
+    setLoadingContacts(true);
+    setError('');
+    try {
+      const response = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data.contacts) {
+        const fetched = response.data.contacts;
+        console.log('Fetched contacts from API:', fetched.length);
+        setContacts(fetched);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('contacts', JSON.stringify(fetched));
+        }
+      } else {
+        console.warn('API response missing contacts:', response.data);
+        setContacts([]);
+      }
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
+      setError('Failed to load contacts. Please try again.');
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, [companyHQId]);
 
   // Refresh from localStorage (no API call)
   const refreshContacts = useCallback(() => {
@@ -147,15 +199,47 @@ export default function InviteProspectPage() {
                 >
                   <RefreshCw className="h-4 w-4" />
                 </button>
+                {companyHQId && (
+                  <button
+                    onClick={fetchContactsFromAPI}
+                    disabled={loadingContacts}
+                    className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-blue-600"
+                    title="Fetch from API"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
               </div>
 
               {/* Contacts List */}
-              {availableContacts.length === 0 ? (
+              {loadingContacts ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                  <p className="text-gray-500">Loading contacts...</p>
+                </div>
+              ) : contacts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">
+                    No contacts found in cache.
+                  </p>
+                  {companyHQId && (
+                    <button
+                      onClick={fetchContactsFromAPI}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                    >
+                      Load Contacts from API
+                    </button>
+                  )}
+                </div>
+              ) : availableContacts.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
                     {searchTerm
                       ? 'No contacts found matching your search'
                       : 'No contacts with email addresses available'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Found {contacts.length} total contacts, but none have email addresses.
                   </p>
                 </div>
               ) : (
