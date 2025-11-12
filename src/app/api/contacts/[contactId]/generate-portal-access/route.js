@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken, getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { randomBytes } from 'crypto';
 
 /**
  * POST /api/contacts/:contactId/generate-portal-access
@@ -77,24 +78,37 @@ export async function POST(request, { params }) {
         });
       }
 
-      // Generate password reset link - handled on our client portal page
-      // Client clicks link → Goes to our reset-password page → Sets password → Redirects to login
-      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+      // Generate a secure random password
+      // Format: 12 characters with mix of uppercase, lowercase, numbers
+      const generatePassword = () => {
+        const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const lowercase = 'abcdefghijkmnpqrstuvwxyz';
+        const numbers = '23456789';
+        const allChars = uppercase + lowercase + numbers;
+        
+        let password = '';
+        // Ensure at least one of each type
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+        
+        // Fill the rest randomly
+        for (let i = password.length; i < 12; i++) {
+          password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+        
+        // Shuffle the password
+        return password.split('').sort(() => Math.random() - 0.5).join('');
+      };
       
-      // Firebase Admin SDK: generatePasswordResetLink(email, actionCodeSettings?)
-      // Try with ActionCodeSettings first, fallback to basic if it fails
-      let resetLink;
-      try {
-        // Try with ActionCodeSettings (if supported by your Firebase Admin SDK version)
-        resetLink = await auth.generatePasswordResetLink(contact.email, {
-          url: `${clientPortalUrl}/reset-password`,
-        });
-      } catch (linkError) {
-        console.error('Error generating password reset link with ActionCodeSettings:', linkError.message);
-        // Fallback: generate basic link (Firebase default page)
-        resetLink = await auth.generatePasswordResetLink(contact.email);
-        console.log('Generated basic reset link (will use Firebase default page):', resetLink);
-      }
+      const generatedPassword = generatePassword();
+      
+      // Set the password on Firebase user
+      await auth.updateUser(firebaseUser.uid, {
+        password: generatedPassword,
+      });
+      
+      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
       
       // Store Firebase UID in Contact (link Contact to Firebase user)
       const existingNotes = contact.notes ? JSON.parse(contact.notes) : {};
@@ -112,17 +126,17 @@ export async function POST(request, { params }) {
         },
       });
 
-      // Return reset link
+      // Return login credentials
       return NextResponse.json({
         success: true,
         invite: {
           contactId,
           contactName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
           contactEmail: contact.email,
-          passwordResetLink: resetLink, // Firebase password reset link
-          loginUrl: `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz'}/login`,
+          password: generatedPassword, // Generated password
+          loginUrl: `${clientPortalUrl}/login`,
         },
-        message: 'Portal access generated. Send the password reset link to the client to set their password.',
+        message: 'Portal access generated. Send the login credentials to the client.',
       });
     } catch (firebaseError) {
       console.error('Firebase user creation error:', firebaseError);
