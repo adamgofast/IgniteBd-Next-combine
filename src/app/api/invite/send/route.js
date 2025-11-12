@@ -48,8 +48,10 @@ export async function POST(request) {
       );
     }
 
-    // Ensure Firebase user exists
+    // Ensure Firebase user exists (upsert - creates if doesn't exist, gets if exists)
+    const wasExisting = !!contact.firebaseUid;
     const firebaseUser = await ensureFirebaseUser(email);
+    const isNewFirebaseUser = !wasExisting && firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime;
 
     // Update contact with Firebase UID
     await prisma.contact.update({
@@ -62,13 +64,22 @@ export async function POST(request) {
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
 
     // Create invite token
-    await prisma.inviteToken.create({
+    const inviteToken = await prisma.inviteToken.create({
       data: {
         contactId,
         email,
         token,
         expiresAt,
       },
+    });
+
+    console.log('✅ Invite created:', {
+      contactId,
+      email,
+      firebaseUid: firebaseUser.uid,
+      firebaseUserCreated: isNewFirebaseUser ? 'NEW' : 'EXISTING',
+      inviteTokenId: inviteToken.id,
+      token: token.substring(0, 8) + '...', // Log partial token for security
     });
 
     const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
@@ -82,11 +93,14 @@ export async function POST(request) {
       invite: {
         contactId,
         email,
+        firebaseUid: firebaseUser.uid,
+        firebaseUserStatus: isNewFirebaseUser ? 'created' : 'existing',
         token,
+        tokenId: inviteToken.id,
         activationLink,
         expiresAt: expiresAt.toISOString(),
       },
-      message: 'Invite token generated. Send the activation link to the client.',
+      message: `✅ Portal access ready! ${isNewFirebaseUser ? 'Created new Firebase user' : 'Using existing Firebase user'} and generated invite token.`,
     });
   } catch (error) {
     console.error('❌ Invite send error:', error);

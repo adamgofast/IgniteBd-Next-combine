@@ -320,11 +320,16 @@ export default function InviteProspectPage() {
                 <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h3 className="text-lg font-semibold text-green-900">
-                    Invite Generated!
+                    ✅ Portal Access Created!
                   </h3>
                   <p className="text-sm text-green-700 mt-1">
                     Send this activation link to <strong>{selectedContact.firstName} {selectedContact.lastName}</strong> ({selectedContact.email})
                   </p>
+                  <div className="mt-2 text-xs text-green-600 space-y-1">
+                    <p>• Firebase User: {inviteCredentials.firebaseUserStatus === 'created' ? '✅ Created' : '✅ Existing'}</p>
+                    <p>• Invite Token: ✅ Generated ({inviteCredentials.token?.substring(0, 8)}...)</p>
+                    <p>• Contact Linked: ✅ Firebase UID stored</p>
+                  </div>
                 </div>
               </div>
 
