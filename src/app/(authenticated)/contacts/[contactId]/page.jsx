@@ -111,22 +111,18 @@ export default function ContactDetailPage({ params }) {
 
     setGeneratingPortal(true);
     try {
-      const token = localStorage.getItem('firebaseToken');
+      // Let the API interceptor handle the Firebase token automatically
       const response = await api.post(
         `/api/contacts/${contact.id}/generate-portal-access`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        {}
       );
 
       if (response.data?.success && response.data.invite) {
-        setPortalLink(response.data.invite.passwordResetLink);
+        const activationLink = response.data.invite.activationLink || response.data.invite.passwordResetLink;
+        setPortalLink(activationLink);
         // Copy to clipboard
-        navigator.clipboard.writeText(response.data.invite.passwordResetLink);
-        alert(`Portal access generated! Password reset link copied to clipboard. Send it to ${contact.email}`);
+        navigator.clipboard.writeText(activationLink);
+        alert(`Portal access generated! Activation link copied to clipboard. Send it to ${contact.email}`);
       } else {
         alert(response.data?.error || 'Failed to generate portal access');
       }
