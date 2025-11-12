@@ -48,6 +48,64 @@ export async function POST(request) {
       );
     }
 
+    // Check if contact is already activated
+    if (contact.isActivated) {
+      return NextResponse.json({
+        success: true,
+        alreadyActivated: true,
+        message: 'Contact is already activated. They can login with their password.',
+        invite: {
+          contactId,
+          email,
+          firebaseUid: contact.firebaseUid,
+          isActivated: true,
+          activatedAt: contact.activatedAt,
+        },
+      });
+    }
+
+    // Check for existing unused, non-expired invite token
+    const existingToken = await prisma.inviteToken.findFirst({
+      where: {
+        contactId,
+        used: false,
+        expiresAt: {
+          gt: new Date(), // Not expired
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Get most recent
+      },
+    });
+
+    // If valid token exists, return it instead of creating new
+    if (existingToken) {
+      const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+      const activationLink = `${clientPortalUrl}/activate?token=${existingToken.token}`;
+
+      console.log('✅ Using existing invite token:', {
+        contactId,
+        email,
+        tokenId: existingToken.id,
+        expiresAt: existingToken.expiresAt,
+      });
+
+      return NextResponse.json({
+        success: true,
+        existingToken: true,
+        invite: {
+          contactId,
+          email,
+          firebaseUid: contact.firebaseUid,
+          token: existingToken.token,
+          tokenId: existingToken.id,
+          activationLink,
+          expiresAt: existingToken.expiresAt.toISOString(),
+        },
+        message: 'Active invite token found. Use this link to activate.',
+      });
+    }
+
     // Ensure Firebase user exists (upsert - creates if doesn't exist, gets if exists)
     const { user: firebaseUser, wasCreated: firebaseUserWasCreated } = await ensureFirebaseUser(email);
 
