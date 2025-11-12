@@ -319,3 +319,17 @@ model Assessment {
   @@index([companyHQId])
   @@map("assessments")
 }
+
+model ClientUpload {
+  id           String   @id @default(cuid())
+  ownerId      String
+  fileUrl      String
+  originalName String
+  fileType     String?
+  size         Int?
+  status       String   @default("stored")
+  createdAt    DateTime @default(now())
+
+  @@index([ownerId])
+  @@map("client_uploads")
+}

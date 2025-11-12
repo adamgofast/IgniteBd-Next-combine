@@ -16,6 +16,7 @@
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@prisma/client": "^6.19.0",
     "@sendgrid/mail": "^8.1.6",
+    "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.35.6",
     "axios": "^1.13.2",
     "firebase": "^12.5.0",
@@ -26,7 +27,8 @@
     "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-hook-form": "^7.66.0"
+    "react-hook-form": "^7.66.0",
+    "uploadthing": "^7.7.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
