@@ -14,6 +14,7 @@ import {
   Clock,
   Package,
   ArrowRight,
+  Plus,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader.jsx';
 import api from '@/lib/api';
@@ -189,11 +190,37 @@ export default function ProposalDetailPage({ params }) {
               </div>
             </div>
             <div className="flex gap-3">
+              {proposal.status === 'draft' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      setSaving(true);
+                      const response = await api.put(`/api/proposals/${params.proposalId}`, {
+                        status: 'active',
+                      });
+                      if (response.data?.proposal) {
+                        setProposal(response.data.proposal);
+                        setLocalData((prev) => ({ ...prev, status: 'active' }));
+                      }
+                    } catch (err) {
+                      console.error('Error updating status:', err);
+                      alert('Failed to update status. Please try again.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <Clock className="h-4 w-4" />
+                  Mark Active
+                </button>
+              )}
               {proposal.status !== 'approved' && (
                 <button
                   onClick={handleApprove}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-gray-100 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-green-600 transition hover:bg-gray-100 disabled:opacity-50"
                 >
                   <CheckCircle className="h-4 w-4" />
                   Approve Proposal
@@ -416,7 +443,7 @@ export default function ProposalDetailPage({ params }) {
               <DollarSign className="h-6 w-6 text-red-600" />
               Compensation
             </h2>
-            {editing !== 'compensation' && (
+            {editing !== 'compensation' && proposal.status !== 'approved' && (
               <button
                 onClick={() => setEditing('compensation')}
                 className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -426,50 +453,86 @@ export default function ProposalDetailPage({ params }) {
               </button>
             )}
           </div>
-          <div className="space-y-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-gray-900">
-                {proposal.totalPrice
-                  ? `$${proposal.totalPrice.toLocaleString()}`
-                  : 'Price TBD'}
-              </span>
-              {compensation?.currency && (
-                <span className="text-gray-600">{compensation.currency}</span>
+          {editing === 'compensation' ? (
+            <CompensationEditor
+              compensation={compensation}
+              totalPrice={proposal.totalPrice}
+              onSave={async (updatedCompensation) => {
+                try {
+                  setSaving(true);
+                  const response = await api.put(`/api/proposals/${params.proposalId}`, {
+                    compensation: updatedCompensation,
+                    totalPrice: updatedCompensation.total,
+                  });
+                  if (response.data?.proposal) {
+                    setProposal(response.data.proposal);
+                    setLocalData((prev) => ({ ...prev, compensation: updatedCompensation }));
+                    setEditing(null);
+                  }
+                } catch (err) {
+                  console.error('Error saving compensation:', err);
+                  alert('Failed to save compensation. Please try again.');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onCancel={() => {
+                setEditing(null);
+                setLocalData((prev) => ({ ...prev, compensation: compensation }));
+              }}
+              saving={saving}
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-gray-900">
+                  {proposal.totalPrice
+                    ? `$${proposal.totalPrice.toLocaleString()}`
+                    : 'Price TBD'}
+                </span>
+                {compensation?.currency && (
+                  <span className="text-gray-600">{compensation.currency}</span>
+                )}
+              </div>
+              {compensation?.paymentStructure && (
+                <p className="text-gray-700">{compensation.paymentStructure}</p>
+              )}
+              {compensation?.payments && Array.isArray(compensation.payments) && (
+                <div className="mt-6 space-y-3">
+                  <h3 className="font-semibold text-gray-900">Payment Schedule</h3>
+                  {compensation.payments.map((payment, index) => (
+                    <div
+                      key={payment.id || index}
+                      className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          ${payment.amount?.toLocaleString() || '0'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {payment.trigger || payment.description || `Payment ${index + 1}`}
+                        </p>
+                        {payment.dueDate && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Due: {new Date(payment.dueDate).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          payment.status === 'paid'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {payment.status || 'pending'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            {compensation?.paymentStructure && (
-              <p className="text-gray-700">{compensation.paymentStructure}</p>
-            )}
-            {compensation?.payments && Array.isArray(compensation.payments) && (
-              <div className="mt-6 space-y-3">
-                <h3 className="font-semibold text-gray-900">Payment Schedule</h3>
-                {compensation.payments.map((payment, index) => (
-                  <div
-                    key={payment.id || index}
-                    className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
-                  >
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        ${payment.amount?.toLocaleString() || '0'}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {payment.trigger || payment.description || `Payment ${index + 1}`}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        payment.status === 'paid'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {payment.status || 'pending'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </section>
 
         {/* Timeline - Milestones */}
@@ -580,6 +643,188 @@ export default function ProposalDetailPage({ params }) {
             )}
           </dl>
         </section>
+      </div>
+    </div>
+  );
+}
+
+// Compensation Editor Component
+function CompensationEditor({ compensation, totalPrice, onSave, onCancel, saving }) {
+  const [currency, setCurrency] = useState(compensation?.currency || 'USD');
+  const [total, setTotal] = useState(totalPrice || compensation?.total || 0);
+  const [paymentStructure, setPaymentStructure] = useState(compensation?.paymentStructure || '');
+  const [payments, setPayments] = useState(
+    compensation?.payments || [
+      { id: '1', amount: totalPrice || 0, trigger: 'Kickoff', status: 'pending' },
+    ]
+  );
+
+  const handleAddPayment = () => {
+    setPayments([
+      ...payments,
+      {
+        id: `payment-${Date.now()}`,
+        amount: 0,
+        trigger: '',
+        description: '',
+        status: 'pending',
+      },
+    ]);
+  };
+
+  const handleUpdatePayment = (index, field, value) => {
+    const updated = [...payments];
+    updated[index] = { ...updated[index], [field]: value };
+    setPayments(updated);
+  };
+
+  const handleRemovePayment = (index) => {
+    if (payments.length > 1) {
+      setPayments(payments.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleSave = () => {
+    const totalAmount = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    onSave({
+      total: totalAmount || total,
+      currency,
+      paymentStructure: paymentStructure || `${payments.length} × $${Math.round((totalAmount || total) / payments.length)}`,
+      payments,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Total Amount
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+            <input
+              type="number"
+              value={total}
+              onChange={(e) => setTotal(parseFloat(e.target.value) || 0)}
+              className="w-full rounded-lg border border-gray-300 pl-8 pr-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Currency
+          </label>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+          >
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="CAD">CAD</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-gray-700">
+          Payment Structure Description
+        </label>
+        <input
+          type="text"
+          value={paymentStructure}
+          onChange={(e) => setPaymentStructure(e.target.value)}
+          placeholder="e.g., 3 × $500 payments"
+          className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+        />
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Payment Schedule</h3>
+          <button
+            onClick={handleAddPayment}
+            className="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+          >
+            <Plus className="h-3 w-3" />
+            Add Payment
+          </button>
+        </div>
+        <div className="space-y-3">
+          {payments.map((payment, index) => (
+            <div
+              key={payment.id || index}
+              className="rounded-lg border border-gray-200 p-4"
+            >
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Amount
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1.5 text-xs text-gray-500">$</span>
+                    <input
+                      type="number"
+                      value={payment.amount || 0}
+                      onChange={(e) =>
+                        handleUpdatePayment(index, 'amount', parseFloat(e.target.value) || 0)
+                      }
+                      className="w-full rounded border border-gray-300 pl-6 pr-2 py-1.5 text-sm"
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Trigger/Description
+                  </label>
+                  <input
+                    type="text"
+                    value={payment.trigger || payment.description || ''}
+                    onChange={(e) =>
+                      handleUpdatePayment(index, 'trigger', e.target.value)
+                    }
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                    placeholder="e.g., Kickoff, Milestone 1"
+                  />
+                </div>
+              </div>
+              {payments.length > 1 && (
+                <button
+                  onClick={() => handleRemovePayment(index)}
+                  className="text-xs text-red-600 hover:text-red-700"
+                >
+                  Remove Payment
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+        >
+          <X className="h-4 w-4" />
+          Cancel
+        </button>
       </div>
     </div>
   );

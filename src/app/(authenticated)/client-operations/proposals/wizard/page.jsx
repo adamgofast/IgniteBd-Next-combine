@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import { useProposals } from '../layout';
 import { useContacts } from '@/app/(authenticated)/contacts/layout';
-import { Plus, X, Package, Calendar, CheckCircle } from 'lucide-react';
+import { Plus, X, Package, Calendar, CheckCircle, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function ProposalWizardPage() {
@@ -44,7 +44,7 @@ export default function ProposalWizardPage() {
     }
   }, [contactsHydrated, contacts.length, refreshContacts]);
 
-  // Load saved services
+  // Load products from API
   useEffect(() => {
     if (companyHQId && step >= 4) {
       loadSavedServices();
@@ -60,16 +60,24 @@ export default function ProposalWizardPage() {
   }, [selectedContact, selectedCompany]);
 
   const loadSavedServices = async () => {
+    if (!companyHQId) return;
     setLoadingServices(true);
     try {
-      // TODO: Create API endpoint for saved services
-      // For now, use localStorage or empty array
-      const saved = typeof window !== 'undefined' 
-        ? JSON.parse(localStorage.getItem('savedServices') || '[]')
-        : [];
-      setSavedServices(saved);
+      // Load products from API
+      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
+      const products = response.data || [];
+      setSavedServices(products);
     } catch (err) {
-      console.error('Error loading services:', err);
+      console.error('Error loading products:', err);
+      // Fallback to localStorage if API fails
+      try {
+        const saved = typeof window !== 'undefined' 
+          ? JSON.parse(localStorage.getItem('savedServices') || '[]')
+          : [];
+        setSavedServices(saved);
+      } catch (parseErr) {
+        setSavedServices([]);
+      }
     } finally {
       setLoadingServices(false);
     }
@@ -177,21 +185,22 @@ export default function ProposalWizardPage() {
       // Update quantity
       setSelectedServices(selectedServices.map(s => 
         s.serviceId === service.id 
-          ? { ...s, quantity: s.quantity + 1 }
+          ? { ...s, quantity: s.quantity + 1, price: s.unitPrice * (s.quantity + 1) }
           : s
       ));
     } else {
       // Add new service
+      const unitPrice = service.price || 0;
       setSelectedServices([
         ...selectedServices,
         {
           serviceId: service.id,
           name: service.name,
-          description: service.description,
-          type: service.type,
-          unitPrice: service.price || 0,
+          description: service.description || service.valueProp || '',
+          type: service.category || 'general',
+          unitPrice: unitPrice,
           quantity: 1,
-          price: service.price || 0, // Total = unitPrice * quantity
+          price: unitPrice, // Total = unitPrice * quantity
         }
       ]);
     }
@@ -631,13 +640,23 @@ export default function ProposalWizardPage() {
               <h2 className="text-lg font-semibold text-gray-900">
                 4. Choose or Add Services/Deliverables
               </h2>
-              <button
-                onClick={() => router.push('/client-operations/services/create')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Plus className="h-4 w-4" />
-                Create Service
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/products/builder')}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Product
+                </button>
+                <button
+                  onClick={loadSavedServices}
+                  disabled={loadingServices}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingServices ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
             </div>
             
             {loadingServices ? (
@@ -647,10 +666,10 @@ export default function ProposalWizardPage() {
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p className="text-sm text-gray-600 mb-4">No saved services yet.</p>
                 <button
-                  onClick={() => router.push('/client-operations/services/create')}
+                  onClick={() => router.push('/products/builder')}
                   className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                 >
-                  Create Your First Service
+                  Create Your First Product
                 </button>
               </div>
             ) : (

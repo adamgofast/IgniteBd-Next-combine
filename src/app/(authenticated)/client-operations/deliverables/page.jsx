@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader';
-import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle, Clock, AlertCircle, RefreshCw, FileCheck } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function DeliverablesPage() {
+  const router = useRouter();
   const [deliverables, setDeliverables] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [companyHQId, setCompanyHQId] = useState('');
 
   useEffect(() => {
@@ -34,11 +37,15 @@ export default function DeliverablesPage() {
     setLoading(false);
   }, []);
 
-  const fetchDeliverables = async () => {
+  const fetchDeliverables = async (isRefresh = false) => {
     if (!companyHQId) return;
     
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       // Fetch all deliverables - API will filter by companyHQId via auth
       const response = await api.get('/api/deliverables');
       if (response.data?.success && response.data.deliverables) {
@@ -52,6 +59,7 @@ export default function DeliverablesPage() {
       console.error('Error fetching deliverables:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -76,6 +84,35 @@ export default function DeliverablesPage() {
           subtitle="Track and manage all deliverables for your active client engagements"
           backTo="/client-operations"
           backLabel="Back to Client Operations"
+          actions={
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fetchDeliverables(true)}
+                disabled={refreshing || loading}
+                className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow transition hover:bg-gray-100 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/client-operations/proposals')}
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+              >
+                <FileCheck className="h-4 w-4" />
+                View Proposals
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/client-operations/deliverables/create')}
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                Create Deliverable
+              </button>
+            </div>
+          }
         />
 
         <div className="mt-8">
@@ -92,12 +129,30 @@ export default function DeliverablesPage() {
               <p className="text-gray-600 mb-6">
                 Deliverables will appear here once proposals are approved and converted.
               </p>
-              <button
-                onClick={fetchDeliverables}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                Refresh
-              </button>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => fetchDeliverables(true)}
+                  disabled={refreshing}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => router.push('/client-operations/proposals')}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                >
+                  <FileCheck className="h-4 w-4" />
+                  View Proposals
+                </button>
+                <button
+                  onClick={() => router.push('/client-operations/deliverables/create')}
+                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Deliverable
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
