@@ -90,11 +90,14 @@ export async function POST(request) {
 
     // If personaId not provided, try to find best match
     let finalPersonaId = personaId;
+    let personaMatchDetails = null;
     if (!finalPersonaId) {
-      finalPersonaId = await findMatchingPersona(contactId, contact.crmId);
+      const matchResult = await findMatchingPersona(contactId, contact.crmId, { returnDetails: true });
+      finalPersonaId = matchResult?.personaId || null;
+      personaMatchDetails = matchResult;
       if (finalPersonaId) {
         console.log(
-          `✅ Auto-matched persona ${finalPersonaId} for contact ${contactId}`,
+          `✅ Auto-matched persona ${finalPersonaId} for contact ${contactId} (confidence: ${matchResult?.confidence || 0}%)`,
         );
       }
     } else {
@@ -144,6 +147,10 @@ export async function POST(request) {
       contactId,
       productId,
       personaId: finalPersonaId,
+      personaMatch: personaMatchDetails ? {
+        confidence: personaMatchDetails.confidence,
+        bestMatch: personaMatchDetails.bestMatch,
+      } : null,
       scores: result.scores,
       summary: result.summary,
     });
@@ -210,7 +217,8 @@ export async function GET(request) {
       );
     }
 
-    const personaId = await findMatchingPersona(contactId, contact.crmId);
+    const matchResult = await findMatchingPersona(contactId, contact.crmId, { returnDetails: true });
+    const personaId = matchResult?.personaId || null;
 
     // Calculate fit score
     const result = await calculateFitScore(contactId, productId, personaId);
@@ -230,6 +238,10 @@ export async function GET(request) {
       contactId,
       productId,
       personaId,
+      personaMatch: matchResult ? {
+        confidence: matchResult.confidence,
+        bestMatch: matchResult.bestMatch,
+      } : null,
       scores: result.scores,
       summary: result.summary,
     });

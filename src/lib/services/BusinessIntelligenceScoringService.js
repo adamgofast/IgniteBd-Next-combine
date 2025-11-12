@@ -313,13 +313,17 @@ function inferBudgetSensitivity(stage, pipeline) {
 
 /**
  * Find best matching persona for a contact
- * Matches based on role/title and industry
+ * Matches based on role/title, industry, and semantic similarity of goals/pain points
  * 
  * @param {string} contactId - Contact ID
  * @param {string} companyHQId - CompanyHQ ID (tenant)
- * @returns {Promise<string|null>} Persona ID or null
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.returnDetails - If true, returns { personaId, confidence, matchDetails } instead of just personaId
+ * @returns {Promise<string|null>} Persona ID or null (or match details if returnDetails=true)
  */
-export async function findMatchingPersona(contactId, companyHQId) {
+export async function findMatchingPersona(contactId, companyHQId, options = {}) {
+  const { returnDetails = false } = options;
+  
   try {
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
@@ -327,13 +331,14 @@ export async function findMatchingPersona(contactId, companyHQId) {
         contactCompany: {
           select: {
             industry: true,
+            companyName: true,
           },
         },
       },
     });
 
     if (!contact) {
-      return null;
+      return returnDetails ? { personaId: null, confidence: 0, matchDetails: null } : null;
     }
 
     // Find personas for this tenant
@@ -344,42 +349,86 @@ export async function findMatchingPersona(contactId, companyHQId) {
     });
 
     if (personas.length === 0) {
-      return null;
+      return returnDetails ? { personaId: null, confidence: 0, matchDetails: null } : null;
     }
 
-    // Simple matching: try to match by title/role
-    const contactTitle = (contact.title || '').toLowerCase();
-    const contactIndustry =
-      contact.contactCompany?.industry?.toLowerCase() || '';
+    // Normalize contact data for matching
+    const contactTitle = (contact.title || '').toLowerCase().trim();
+    const contactIndustry = (contact.contactCompany?.industry || '').toLowerCase().trim();
+    const contactNotes = (contact.notes || '').toLowerCase().trim();
 
-    // Find best match
+    // Find best match with scoring
     let bestMatch = null;
     let bestScore = 0;
+    const matchDetails = [];
 
     for (const persona of personas) {
       let score = 0;
+      const reasons = [];
 
-      // Match by role/title
-      const personaRole = (persona.role || '').toLowerCase();
-      const personaTitle = (persona.title || '').toLowerCase();
-      if (
-        contactTitle &&
-        (personaRole.includes(contactTitle) ||
-          contactTitle.includes(personaRole) ||
-          personaTitle.includes(contactTitle))
-      ) {
-        score += 2;
+      // 1. Match by role/title (weight: 3 points)
+      const personaRole = (persona.role || '').toLowerCase().trim();
+      const personaTitle = (persona.title || '').toLowerCase().trim();
+      
+      if (contactTitle && (personaRole || personaTitle)) {
+        // Exact match
+        if (contactTitle === personaRole || contactTitle === personaTitle) {
+          score += 3;
+          reasons.push('Exact role/title match');
+        }
+        // Partial match (contains)
+        else if (
+          (personaRole && (personaRole.includes(contactTitle) || contactTitle.includes(personaRole))) ||
+          (personaTitle && (personaTitle.includes(contactTitle) || contactTitle.includes(personaTitle)))
+        ) {
+          score += 2;
+          reasons.push('Partial role/title match');
+        }
+        // Keyword match (common titles)
+        else {
+          const commonKeywords = ['ceo', 'cto', 'cfo', 'coo', 'founder', 'owner', 'director', 'manager', 'head', 'lead', 'vp', 'president'];
+          const contactKeywords = commonKeywords.filter(k => contactTitle.includes(k));
+          const personaKeywords = commonKeywords.filter(k => 
+            (personaRole && personaRole.includes(k)) || (personaTitle && personaTitle.includes(k))
+          );
+          if (contactKeywords.length > 0 && personaKeywords.length > 0 && 
+              contactKeywords.some(k => personaKeywords.includes(k))) {
+            score += 1;
+            reasons.push('Keyword match');
+          }
+        }
       }
 
-      // Match by industry
-      const personaIndustry = (persona.industry || '').toLowerCase();
-      if (
-        contactIndustry &&
-        personaIndustry &&
-        personaIndustry.includes(contactIndustry)
-      ) {
-        score += 1;
+      // 2. Match by industry (weight: 2 points)
+      const personaIndustry = (persona.industry || '').toLowerCase().trim();
+      if (contactIndustry && personaIndustry) {
+        if (contactIndustry === personaIndustry) {
+          score += 2;
+          reasons.push('Exact industry match');
+        } else if (personaIndustry.includes(contactIndustry) || contactIndustry.includes(personaIndustry)) {
+          score += 1;
+          reasons.push('Partial industry match');
+        }
       }
+
+      // 3. Match by goals/pain points in notes (weight: 1 point)
+      // Simple keyword matching - can be enhanced with semantic similarity later
+      if (contactNotes && (persona.goals || persona.painPoints)) {
+        const personaText = ((persona.goals || '') + ' ' + (persona.painPoints || '')).toLowerCase();
+        const keywords = personaText.split(/\s+/).filter(w => w.length > 4); // Words longer than 4 chars
+        const matchingKeywords = keywords.filter(k => contactNotes.includes(k));
+        if (matchingKeywords.length > 0) {
+          score += Math.min(1, matchingKeywords.length / 3); // Cap at 1 point
+          reasons.push(`Found ${matchingKeywords.length} matching keywords in notes`);
+        }
+      }
+
+      matchDetails.push({
+        personaId: persona.id,
+        personaName: persona.name,
+        score,
+        reasons: reasons.length > 0 ? reasons : ['No matches found'],
+      });
 
       if (score > bestScore) {
         bestScore = score;
@@ -387,10 +436,46 @@ export async function findMatchingPersona(contactId, companyHQId) {
       }
     }
 
+    // Calculate confidence (0-100) based on best score
+    // Max possible score is 6 (3 for role + 2 for industry + 1 for notes)
+    const maxPossibleScore = 6;
+    const confidence = bestScore > 0 
+      ? Math.round((bestScore / maxPossibleScore) * 100) 
+      : 0;
+
+    // Only return match if confidence is at least 20% (threshold can be adjusted)
+    const minConfidenceThreshold = 20;
+    if (confidence < minConfidenceThreshold) {
+      console.log(`⚠️ Persona match confidence too low (${confidence}%) for contact ${contactId}`);
+      return returnDetails 
+        ? { personaId: null, confidence, matchDetails } 
+        : null;
+    }
+
+    if (bestMatch) {
+      console.log(`✅ Matched persona "${bestMatch.name}" (${bestMatch.id}) to contact ${contactId} with ${confidence}% confidence`);
+    }
+
+    if (returnDetails) {
+      return {
+        personaId: bestMatch?.id || null,
+        confidence,
+        matchDetails: matchDetails.sort((a, b) => b.score - a.score), // Sort by score descending
+        bestMatch: bestMatch ? {
+          id: bestMatch.id,
+          name: bestMatch.name,
+          role: bestMatch.role,
+          industry: bestMatch.industry,
+        } : null,
+      };
+    }
+
     return bestMatch?.id || null;
   } catch (error) {
     console.error('❌ Error finding matching persona:', error);
-    return null;
+    return returnDetails 
+      ? { personaId: null, confidence: 0, matchDetails: null, error: error.message } 
+      : null;
   }
 }
 

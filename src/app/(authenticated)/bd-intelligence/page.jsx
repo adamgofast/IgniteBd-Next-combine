@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Brain, AlertCircle, Loader2, ArrowRight, Target } from 'lucide-react';
+import { Brain, AlertCircle, Loader2, ArrowRight, Target, UserCircle, TrendingUp } from 'lucide-react';
 import api from '@/lib/api';
 
 export default function BDIntelligencePage() {
@@ -251,6 +251,50 @@ export default function BDIntelligencePage() {
         {/* Results */}
         {scoreResult && (
           <div className="space-y-6">
+            {/* Persona Match Info */}
+            {scoreResult.personaMatch && scoreResult.personaMatch.bestMatch && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-full bg-blue-100 p-3">
+                    <UserCircle className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Matched Persona</h3>
+                        <p className="mt-1 text-lg font-bold text-blue-700">
+                          {scoreResult.personaMatch.bestMatch.name}
+                        </p>
+                        {scoreResult.personaMatch.bestMatch.role && (
+                          <p className="mt-1 text-sm text-gray-600">
+                            {scoreResult.personaMatch.bestMatch.role}
+                            {scoreResult.personaMatch.bestMatch.industry && 
+                              ` • ${scoreResult.personaMatch.bestMatch.industry}`
+                            }
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-gray-600">Confidence</span>
+                        </div>
+                        <p className="mt-1 text-2xl font-bold text-blue-600">
+                          {scoreResult.personaMatch.confidence}%
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-gray-500">
+                      This persona was automatically matched based on role, industry, and contact details.
+                      {scoreResult.personaId && (
+                        <span className="ml-1">Persona ID: {scoreResult.personaId}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Score Display */}
             <div
               className={`rounded-xl border-2 p-8 shadow-sm ${getScoreBgColor(
