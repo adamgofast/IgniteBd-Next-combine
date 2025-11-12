@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { verifyFirebaseToken, getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { convertProposalToDeliverables } from '@/lib/services/ProposalToDeliverablesService';
 
 /**
@@ -101,12 +101,88 @@ export async function POST(request, { params }) {
       orderBy: { dueDate: 'asc' },
     });
 
+    // Automatically generate portal access for the primary contact
+    let portalAccessResult = null;
+    try {
+      if (proposal.company?.contacts && proposal.company.contacts.length > 0) {
+        const primaryContact = proposal.company.contacts[0];
+        
+        if (primaryContact.email) {
+          // Generate portal access using Firebase
+          const admin = getFirebaseAdmin();
+          if (admin) {
+            const auth = admin.auth();
+            let firebaseUser;
+            
+            try {
+              // Try to get existing user by email
+              try {
+                firebaseUser = await auth.getUserByEmail(primaryContact.email);
+              } catch (error) {
+                // User doesn't exist - create new
+                firebaseUser = await auth.createUser({
+                  email: primaryContact.email,
+                  displayName: `${primaryContact.firstName || ''} ${primaryContact.lastName || ''}`.trim() || primaryContact.email,
+                  emailVerified: false,
+                  disabled: false,
+                });
+              }
+
+              // Generate password reset link
+              const resetLink = await auth.generatePasswordResetLink(primaryContact.email);
+              
+              // Store Firebase UID in Contact notes
+              const existingNotes = primaryContact.notes ? JSON.parse(primaryContact.notes) : {};
+              await prisma.contact.update({
+                where: { id: primaryContact.id },
+                data: {
+                  notes: JSON.stringify({
+                    ...existingNotes,
+                    clientPortalAuth: {
+                      firebaseUid: firebaseUser.uid,
+                      generatedAt: new Date().toISOString(),
+                      portalUrl: process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001',
+                      generatedFromProposal: proposalId,
+                    },
+                  }),
+                },
+              });
+
+              portalAccessResult = {
+                success: true,
+                contactId: primaryContact.id,
+                contactEmail: primaryContact.email,
+                passwordResetLink: resetLink,
+                loginUrl: `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'http://localhost:3001'}/login`,
+              };
+              
+              console.log('✅ Portal access generated for contact:', primaryContact.email);
+            } catch (firebaseError) {
+              console.error('❌ Failed to generate portal access:', firebaseError);
+              portalAccessResult = {
+                success: false,
+                error: firebaseError.message,
+              };
+            }
+          }
+        }
+      }
+    } catch (portalError) {
+      console.error('❌ Portal access generation error (non-blocking):', portalError);
+      // Don't fail the approval if portal generation fails
+      portalAccessResult = {
+        success: false,
+        error: portalError.message,
+      };
+    }
+
     return NextResponse.json({
       success: true,
       proposal: updatedProposal,
       conversion: conversionResult,
       deliverables,
-      message: `Proposal approved. Created ${deliverables.length} deliverables.`,
+      portalAccess: portalAccessResult,
+      message: `Proposal approved. Created ${deliverables.length} deliverables.${portalAccessResult?.success ? ' Portal access generated for client.' : ''}`,
     });
   } catch (error) {
     console.error('❌ ApproveProposal error:', error);
