@@ -99,15 +99,17 @@ const resetLink = await auth.generatePasswordResetLink(contact.email);
 
 **Critical: How It Works Even Without a Password**
 - Firebase's `generatePasswordResetLink` works **even when the user has NO password set**
-- When the client clicks the link, Firebase takes them to **Firebase's hosted password reset page** (not our client portal)
+- When the client clicks the link, they go to **our custom `/reset-password` page** in the client portal (NOT Firebase's hosted page)
+- We use `handleCodeInApp: true` to handle the password reset on our own page
+- The `oobCode` (out-of-band code) is passed in the URL query params
+- Our page extracts the `oobCode` and uses Firebase Client SDK's `confirmPasswordReset()` to set the password
 - It's not really a "reset" - it's more like a "set your initial password" link
 - The client doesn't need to know any existing password because **there isn't one**
-- Firebase uses the `oobCode` (out-of-band code) in the URL to verify the request is legitimate
 - The link is time-limited and expires after a set time (Firebase default)
-- After setting their password, Firebase redirects them to our client portal login page (via `continueUrl`)
+- After setting their password, they're redirected to our client portal login page
 - Once they set their password via the link, they can then log in normally with email + password
 
-**Important:** The password setup happens on Firebase's page, NOT our client portal. After they set it, they're redirected to our portal login.
+**Important:** The password setup happens on **our client portal page** (`/reset-password`), styled with our black/silver theme, NOT Firebase's generic page.
 
 ### 6. Store Firebase UID in Database (Server-Side)
 
