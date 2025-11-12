@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken, getFirebaseAdmin } from '@/lib/firebaseAdmin';
-import { randomBytes } from 'crypto';
 
 /**
  * POST /api/contacts/:contactId/generate-portal-access
