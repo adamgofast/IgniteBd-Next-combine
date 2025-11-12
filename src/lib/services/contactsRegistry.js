@@ -223,8 +223,8 @@ let registryInstance = null;
 export function getContactsRegistry() {
   if (!registryInstance) {
     registryInstance = new ContactsRegistry();
-    // Auto-load from cache on first access
-    registryInstance.loadFromCache();
+    // Don't auto-load from cache - let components call loadFromCache() explicitly
+    // This prevents SSR issues with window/localStorage
   }
   return registryInstance;
 }

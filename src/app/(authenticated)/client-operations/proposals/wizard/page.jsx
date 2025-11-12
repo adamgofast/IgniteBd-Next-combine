@@ -38,8 +38,9 @@ export default function ProposalWizardPage() {
   const [error, setError] = useState('');
   const [loadingCompany, setLoadingCompany] = useState(false);
 
-  // Load contacts from registry on mount
+  // Load contacts from registry on mount (client-side only)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     if (!registry.hydrated) {
       registry.loadFromCache();
     }
@@ -77,8 +78,9 @@ export default function ProposalWizardPage() {
     registry.loadFromCache();
   }, [registry]);
 
-  // Get available contacts using registry search
+  // Get available contacts using registry search (client-side only)
   const availableContacts = useMemo(() => {
+    if (typeof window === 'undefined') return [];
     // If no search term, show all contacts
     if (!contactSearch || !contactSearch.trim()) {
       return registry.getAll().slice(0, 20);
@@ -173,14 +175,11 @@ export default function ProposalWizardPage() {
         contactCompanyId: company.id,
       });
 
-      // Refresh contacts to get updated data
-      await refreshContacts();
+      // Refresh registry to get updated contact data
+      await fetchContactsFromAPI();
       
-      // Get updated contact
-      const updatedContacts = await api.get(`/api/contacts?companyHQId=${companyHQId}`);
-      const updatedContact = updatedContacts.data?.contacts?.find(
-        (c) => c.id === selectedContact.id
-      );
+      // Get updated contact from registry
+      const updatedContact = registry.getById(selectedContact.id);
 
       if (updatedContact?.contactCompany) {
         setSelectedCompany(updatedContact.contactCompany);
@@ -189,6 +188,8 @@ export default function ProposalWizardPage() {
       } else {
         setSelectedCompany(company);
         setCompanyNameInput(company.companyName);
+        // Update registry with new company link
+        registry.updateContact(selectedContact.id, { contactCompany: company });
       }
       
       setCompanyConfirmed(true);
@@ -462,21 +463,74 @@ export default function ProposalWizardPage() {
             <h2 className="mb-4 text-lg font-semibold text-gray-900">
               1. Find Contact
             </h2>
-            <input
-              type="text"
-              value={contactSearch}
-              onChange={(e) => setContactSearch(e.target.value)}
-              placeholder="Search contacts by name, email, or company..."
-              className="mb-4 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-            />
+
+            {/* Search and Refresh */}
+            <div className="mb-6 flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Type to search contacts by name, email, or company..."
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  autoFocus
+                />
+                {contactSearch && (
+                  <button
+                    onClick={() => setContactSearch('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={refreshContacts}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                title="Refresh from cache"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
+              {companyHQId && (
+                <button
+                  onClick={fetchContactsFromAPI}
+                  disabled={loadingContacts}
+                  className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-blue-600"
+                  title="Fetch from API"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+            </div>
+
+            {/* Selected Contact Display */}
             {selectedContact && (
               <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">
-                      {selectedContact.firstName} {selectedContact.lastName}
-                    </p>
-                    <p className="text-sm text-gray-600">{selectedContact.email}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <User className="h-5 w-5 text-green-600" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {selectedContact.firstName} {selectedContact.lastName}
+                      </p>
+                      {selectedContact.email && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          <p className="text-sm text-gray-600">{selectedContact.email}</p>
+                        </div>
+                      )}
+                      {selectedContact.contactCompany?.companyName && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {selectedContact.contactCompany.companyName}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => {
@@ -492,46 +546,107 @@ export default function ProposalWizardPage() {
                 </div>
               </div>
             )}
+
+            {/* Contacts List */}
             {!selectedContact && (
-              <div className="max-h-64 space-y-2 overflow-y-auto">
-                {filteredContacts.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-500">
-                    {contacts.length === 0
-                      ? 'No contacts found. Create a contact first.'
-                      : 'No contacts match your search.'}
-                  </p>
+              <>
+                {loadingContacts ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2" />
+                    <p className="text-gray-500">Loading contacts...</p>
+                  </div>
+                ) : registry.getCount() === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 mb-4">
+                      No contacts found in cache.
+                    </p>
+                    {companyHQId && (
+                      <button
+                        onClick={fetchContactsFromAPI}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        Load Contacts from API
+                      </button>
+                    )}
+                  </div>
+                ) : availableContacts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">
+                      {contactSearch
+                        ? `No contacts found matching "${contactSearch}"`
+                        : 'No contacts available'}
+                    </p>
+                    {contactSearch && (
+                      <button
+                        onClick={() => setContactSearch('')}
+                        className="mt-2 text-sm text-red-600 hover:text-red-700"
+                      >
+                        Clear search to see all contacts
+                      </button>
+                    )}
+                  </div>
                 ) : (
-                  filteredContacts.map((contact) => (
-                    <button
-                      key={contact.id}
-                      onClick={() => handleContactSelect(contact)}
-                      className="w-full rounded-lg border border-gray-200 bg-white p-4 text-left transition hover:bg-gray-50"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {contact.firstName} {contact.lastName}
-                          </p>
-                          <p className="text-sm text-gray-600">{contact.email}</p>
-                          {contact.contactCompany && (
-                            <p className="text-xs text-gray-500">
-                              {contact.contactCompany.companyName}
-                            </p>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {contactSearch && (
+                      <p className="text-xs text-gray-500 mb-2 px-2">
+                        Showing {availableContacts.length} of {registry.getCount()} contacts
+                      </p>
+                    )}
+                    {availableContacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() => handleContactSelect(contact)}
+                        className={`w-full text-left p-4 rounded-lg border-2 transition ${
+                          selectedContact?.id === contact.id
+                            ? 'border-red-600 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <User className="h-5 w-5 text-red-600" />
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {contact.firstName} {contact.lastName}
+                              </p>
+                              {contact.email && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Mail className="h-4 w-4 text-gray-400" />
+                                  <p className="text-sm text-gray-600">{contact.email}</p>
+                                </div>
+                              )}
+                              {contact.contactCompany?.companyName && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {contact.contactCompany.companyName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {selectedContact?.id === contact.id && (
+                            <CheckCircle className="h-5 w-5 text-red-600" />
                           )}
                         </div>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </div>
+              </>
             )}
+
+            {/* Continue Button */}
             {selectedContact && (
-              <button
-                onClick={() => setStep(2)}
-                className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-              >
-                Continue to Business Confirmation
-              </button>
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 flex items-center justify-center gap-2"
+                >
+                  Continue to Confirm Company
+                </button>
+              </div>
             )}
           </div>
         )}

@@ -380,7 +380,7 @@ export default function ProposalDetailPage({ params }) {
               <Calendar className="h-6 w-6 text-red-600" />
               Scope of Work
             </h2>
-            {editing !== 'phases' && (
+            {editing !== 'phases' && proposal.status !== 'approved' && (
               <button
                 onClick={() => setEditing('phases')}
                 className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -390,7 +390,34 @@ export default function ProposalDetailPage({ params }) {
               </button>
             )}
           </div>
-          {phases.length > 0 ? (
+          {editing === 'phases' ? (
+            <PhasesInlineEditor
+              phases={phases}
+              onSave={async (updatedPhases) => {
+                try {
+                  setSaving(true);
+                  const response = await api.put(`/api/proposals/${params.proposalId}`, {
+                    phases: updatedPhases,
+                  });
+                  if (response.data?.proposal) {
+                    setProposal(response.data.proposal);
+                    setLocalData((prev) => ({ ...prev, phases: updatedPhases }));
+                    setEditing(null);
+                  }
+                } catch (err) {
+                  console.error('Error saving phases:', err);
+                  alert('Failed to save phases. Please try again.');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onCancel={() => {
+                setEditing(null);
+                setLocalData((prev) => ({ ...prev, phases: phases }));
+              }}
+              saving={saving}
+            />
+          ) : phases.length > 0 ? (
             <div className="space-y-4">
               {phases.map((phase, index) => {
                 const colorClasses = {
@@ -452,6 +479,14 @@ export default function ProposalDetailPage({ params }) {
               <p className="text-sm mt-2">
                 Phases define the scope of work and deliverables.
               </p>
+              {proposal.status !== 'approved' && (
+                <button
+                  onClick={() => setEditing('phases')}
+                  className="mt-4 text-red-600 hover:text-red-700 font-semibold"
+                >
+                  Add Phases →
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -562,7 +597,7 @@ export default function ProposalDetailPage({ params }) {
               <Clock className="h-6 w-6 text-red-600" />
               Timeline & Milestones
             </h2>
-            {editing !== 'milestones' && (
+            {editing !== 'milestones' && proposal.status !== 'approved' && (
               <button
                 onClick={() => setEditing('milestones')}
                 className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
@@ -572,7 +607,35 @@ export default function ProposalDetailPage({ params }) {
               </button>
             )}
           </div>
-          {milestones.length > 0 ? (
+          {editing === 'milestones' ? (
+            <MilestonesInlineEditor
+              milestones={milestones}
+              phases={phases}
+              onSave={async (updatedMilestones) => {
+                try {
+                  setSaving(true);
+                  const response = await api.put(`/api/proposals/${params.proposalId}`, {
+                    milestones: updatedMilestones,
+                  });
+                  if (response.data?.proposal) {
+                    setProposal(response.data.proposal);
+                    setLocalData((prev) => ({ ...prev, milestones: updatedMilestones }));
+                    setEditing(null);
+                  }
+                } catch (err) {
+                  console.error('Error saving milestones:', err);
+                  alert('Failed to save milestones. Please try again.');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              onCancel={() => {
+                setEditing(null);
+                setLocalData((prev) => ({ ...prev, milestones: milestones }));
+              }}
+              saving={saving}
+            />
+          ) : milestones.length > 0 ? (
             <div className="relative">
               {/* Timeline line */}
               <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
@@ -628,6 +691,14 @@ export default function ProposalDetailPage({ params }) {
               <p className="text-sm mt-2">
                 Milestones help track progress through the engagement.
               </p>
+              {proposal.status !== 'approved' && (
+                <button
+                  onClick={() => setEditing('milestones')}
+                  className="mt-4 text-red-600 hover:text-red-700 font-semibold"
+                >
+                  Add Milestones →
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -663,6 +734,374 @@ export default function ProposalDetailPage({ params }) {
             )}
           </dl>
         </section>
+      </div>
+    </div>
+  );
+}
+
+// Phases Inline Editor Component
+function PhasesInlineEditor({ phases, onSave, onCancel, saving }) {
+  const [localPhases, setLocalPhases] = useState(phases || []);
+
+  const handleAddPhase = () => {
+    setLocalPhases([
+      ...localPhases,
+      {
+        id: `phase-${Date.now()}`,
+        name: '',
+        weeks: '',
+        color: localPhases.length === 0 ? 'red' : localPhases.length === 1 ? 'yellow' : 'purple',
+        goal: '',
+        deliverables: [],
+        outcome: '',
+      },
+    ]);
+  };
+
+  const handleUpdatePhase = (phaseId, updates) => {
+    setLocalPhases(localPhases.map((p) => (p.id === phaseId ? { ...p, ...updates } : p)));
+  };
+
+  const handleDeletePhase = (phaseId) => {
+    if (!confirm('Delete this phase?')) return;
+    setLocalPhases(localPhases.filter((p) => p.id !== phaseId));
+  };
+
+  const handleAddDeliverable = (phaseId) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          return {
+            ...p,
+            deliverables: [...(p.deliverables || []), ''],
+          };
+        }
+        return p;
+      }),
+    );
+  };
+
+  const handleUpdateDeliverable = (phaseId, index, value) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          const deliverables = [...(p.deliverables || [])];
+          deliverables[index] = value;
+          return { ...p, deliverables };
+        }
+        return p;
+      }),
+    );
+  };
+
+  const handleRemoveDeliverable = (phaseId, index) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          const deliverables = [...(p.deliverables || [])];
+          deliverables.splice(index, 1);
+          return { ...p, deliverables };
+        }
+        return p;
+      }),
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {localPhases.length} {localPhases.length === 1 ? 'phase' : 'phases'}
+        </p>
+        <button
+          onClick={handleAddPhase}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add Phase
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {localPhases.map((phase, index) => {
+          const colorClasses = {
+            red: 'border-red-200 bg-red-50',
+            yellow: 'border-yellow-200 bg-yellow-50',
+            purple: 'border-purple-200 bg-purple-50',
+          };
+          const colorClass = colorClasses[phase.color] || colorClasses.red;
+          return (
+            <div key={phase.id || index} className={`rounded-lg border p-6 ${colorClass}`}>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Phase {index + 1}</h3>
+                <button
+                  onClick={() => handleDeletePhase(phase.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-700">
+                      Phase Name
+                    </label>
+                    <input
+                      type="text"
+                      value={phase.name || ''}
+                      onChange={(e) => handleUpdatePhase(phase.id, { name: e.target.value })}
+                      placeholder="e.g., Foundation"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-700">
+                      Weeks
+                    </label>
+                    <input
+                      type="text"
+                      value={phase.weeks || ''}
+                      onChange={(e) => handleUpdatePhase(phase.id, { weeks: e.target.value })}
+                      placeholder="e.g., 1-3"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Goal</label>
+                  <textarea
+                    value={phase.goal || ''}
+                    onChange={(e) => handleUpdatePhase(phase.id, { goal: e.target.value })}
+                    placeholder="Phase goal..."
+                    rows={2}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Deliverables
+                    </label>
+                    <button
+                      onClick={() => handleAddDeliverable(phase.id)}
+                      className="text-xs text-red-600 hover:text-red-700"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(phase.deliverables || []).map((deliverable, delIndex) => (
+                      <div key={delIndex} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={deliverable}
+                          onChange={(e) =>
+                            handleUpdateDeliverable(phase.id, delIndex, e.target.value)
+                          }
+                          placeholder="e.g., 3 Target Personas"
+                          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                        <button
+                          onClick={() => handleRemoveDeliverable(phase.id, delIndex)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Outcome
+                  </label>
+                  <textarea
+                    value={phase.outcome || ''}
+                    onChange={(e) => handleUpdatePhase(phase.id, { outcome: e.target.value })}
+                    placeholder="Expected outcome..."
+                    rows={2}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t">
+        <button
+          onClick={() => onSave(localPhases)}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          Save All
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+        >
+          <X className="h-4 w-4" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Milestones Inline Editor Component
+function MilestonesInlineEditor({ milestones, phases, onSave, onCancel, saving }) {
+  const [localMilestones, setLocalMilestones] = useState(milestones || []);
+
+  const handleAddMilestone = () => {
+    const nextWeek = localMilestones.length > 0 
+      ? Math.max(...localMilestones.map(m => m.week || 0)) + 1
+      : 1;
+    setLocalMilestones([
+      ...localMilestones,
+      {
+        week: nextWeek,
+        phase: phases[0]?.name || '',
+        phaseColor: phases[0]?.color || 'red',
+        milestone: '',
+        deliverable: '',
+        completed: false,
+      },
+    ]);
+  };
+
+  const handleUpdateMilestone = (index, updates) => {
+    const updated = [...localMilestones];
+    updated[index] = { ...updated[index], ...updates };
+    setLocalMilestones(updated);
+  };
+
+  const handleDeleteMilestone = (index) => {
+    if (!confirm('Delete this milestone?')) return;
+    setLocalMilestones(localMilestones.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {localMilestones.length} {localMilestones.length === 1 ? 'milestone' : 'milestones'}
+        </p>
+        <button
+          onClick={handleAddMilestone}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add Milestone
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {localMilestones.map((milestone, index) => (
+          <div key={index} className="rounded-lg border border-gray-200 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Milestone {index + 1}</h3>
+              <button
+                onClick={() => handleDeleteMilestone(index)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">Week</label>
+                  <input
+                    type="number"
+                    value={milestone.week || index + 1}
+                    onChange={(e) =>
+                      handleUpdateMilestone(index, { week: parseInt(e.target.value) || index + 1 })
+                    }
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Phase Color
+                  </label>
+                  <select
+                    value={milestone.phaseColor || 'red'}
+                    onChange={(e) => handleUpdateMilestone(index, { phaseColor: e.target.value })}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="red">Red</option>
+                    <option value="yellow">Yellow</option>
+                    <option value="purple">Purple</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-700">Phase</label>
+                <input
+                  type="text"
+                  value={milestone.phase || ''}
+                  onChange={(e) => handleUpdateMilestone(index, { phase: e.target.value })}
+                  placeholder="Phase name"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-700">
+                  Milestone Name
+                </label>
+                <input
+                  type="text"
+                  value={milestone.milestone || ''}
+                  onChange={(e) => handleUpdateMilestone(index, { milestone: e.target.value })}
+                  placeholder="e.g., Kickoff Meeting"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-700">
+                  Deliverable
+                </label>
+                <textarea
+                  value={milestone.deliverable || ''}
+                  onChange={(e) => handleUpdateMilestone(index, { deliverable: e.target.value })}
+                  placeholder="What will be delivered..."
+                  rows={2}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t">
+        <button
+          onClick={() => onSave(localMilestones)}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          Save All
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+        >
+          <X className="h-4 w-4" />
+          Cancel
+        </button>
       </div>
     </div>
   );
