@@ -16,6 +16,9 @@ import {
   BarChart,
   Palette,
   Rocket,
+  Mail,
+  Calendar,
+  Share2,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -46,13 +49,16 @@ const navigationGroups = [
   {
     name: 'Engage',
     items: [
-      { name: 'Engage Hub', path: '/outreach', icon: MessageSquare },
+      { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },
   {
     name: 'Nurture',
     items: [
       { name: 'People Hub', path: '/contacts', icon: Users },
+      { name: 'Email Marketing', path: '#', icon: Mail, disabled: true },
+      { name: 'Social Media', path: '#', icon: Share2, disabled: true },
     ],
   },
   {
@@ -123,19 +129,30 @@ function Sidebar() {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
+                const disabled = item.disabled;
                 return (
                   <li key={item.path}>
-                    <Link
-                      href={item.path}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                        active
-                          ? 'border border-red-200 bg-red-50 text-red-700'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span>{item.name}</span>
-                    </Link>
+                    {disabled ? (
+                      <div
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 opacity-50 cursor-not-allowed"
+                        title="Coming soon"
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </div>
+                    ) : (
+                      <Link
+                        href={item.path}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? 'border border-red-200 bg-red-50 text-red-700'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </Link>
+                    )}
                   </li>
                 );
               })}
