@@ -28,15 +28,22 @@ async function main() {
       const auth = data.clientPortalAuth;
       
       if (auth?.firebaseUid) {
+        // Extract other notes data (keep everything except clientPortalAuth)
+        const { clientPortalAuth, ...otherNotes } = data;
+        
+        // Clean notes - remove clientPortalAuth, keep rest
+        const cleanedNotes = Object.keys(otherNotes).length > 0 ? JSON.stringify(otherNotes) : null;
+        
         await prisma.contact.update({
           where: { id: c.id },
           data: {
             firebaseUid: auth.firebaseUid,
             clientPortalUrl: auth.portalUrl || 'https://clientportal.ignitegrowth.biz',
+            notes: cleanedNotes, // Clean notes - remove clientPortalAuth JSON
             updatedAt: new Date(),
           },
         });
-        console.log(`✅ Migrated ${c.email || c.id} - firebaseUid: ${auth.firebaseUid.substring(0, 8)}...`);
+        console.log(`✅ Migrated ${c.email || c.id} - firebaseUid: ${auth.firebaseUid.substring(0, 8)}... (cleaned notes)`);
         migrated++;
       }
     } catch (err) {
