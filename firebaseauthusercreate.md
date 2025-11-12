@@ -96,11 +96,15 @@ const resetLink = await auth.generatePasswordResetLink(contact.email);
 - A **complete URL string** (not a parameter, not a token)
 - Example: `https://your-project.firebaseapp.com/__/auth/action?mode=resetPassword&oobCode=ABC123xyz&apiKey=...`
 - This is a **clickable link** that the client will use in their browser
-- Firebase creates a secure, time-limited link
-- Link allows user to SET their password (not reset an existing one)
-- Works even if user has no password yet
-- Link expires after a set time (Firebase default)
-- The URL contains an `oobCode` (out-of-band code) parameter that Firebase uses to verify the request
+
+**Critical: How It Works Even Without a Password**
+- Firebase's `generatePasswordResetLink` works **even when the user has NO password set**
+- When the client clicks the link, Firebase takes them to a page where they **SET their password for the first time**
+- It's not really a "reset" - it's more like a "set your initial password" link
+- The client doesn't need to know any existing password because **there isn't one**
+- Firebase uses the `oobCode` (out-of-band code) in the URL to verify the request is legitimate
+- The link is time-limited and expires after a set time (Firebase default)
+- Once they set their password via the link, they can then log in normally with email + password
 
 ### 6. Store Firebase UID in Database (Server-Side)
 
