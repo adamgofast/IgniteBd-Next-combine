@@ -171,6 +171,25 @@ return NextResponse.json({
    - This allows re-inviting contacts
    - Each link is unique and time-limited
 
+### Q: How does the client reset their password if they don't have one yet?
+
+**A: They don't "reset" - they SET it for the first time!**
+
+**The Flow:**
+1. We create Firebase user **WITHOUT a password** (passwordless state)
+2. We generate a password reset link (works even without a password)
+3. Client clicks the link → Firebase takes them to a page
+4. Client enters a NEW password (no "old password" field because there isn't one)
+5. Firebase validates the `oobCode` in the URL to ensure it's legitimate
+6. Client's password is now set
+7. Client can now log in normally with email + password
+
+**Key Point:** Firebase's `generatePasswordResetLink` works for BOTH:
+- Users who have a password (actual reset)
+- Users who don't have a password (first-time setup)
+
+The client doesn't need to know any existing password because **there isn't one**.
+
 ### Q: Does Firebase just spit out a password?
 
 **A: NO - Firebase does NOT create a password for us.**
