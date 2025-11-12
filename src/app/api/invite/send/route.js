@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
+import { verifyFirebaseToken, getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { ensureFirebaseUser } from '@/lib/firebaseUser';
 import { randomBytes } from 'crypto';
 
@@ -106,43 +106,32 @@ export async function POST(request) {
       });
     }
 
-    // Check if Firebase user already exists (contact already has firebaseUid)
+    // Hardcoded client portal URL
+    const clientPortalUrl = 'https://clientportal.ignitegrowth.biz';
+
+    // Ensure Firebase user exists (handles both new and existing users)
+    const displayName = contact.firstName || contact.lastName 
+      ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+      : null;
+    
     let firebaseUser;
     let firebaseUserWasCreated = false;
-    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
-
+    
     if (contact.firebaseUid) {
-      // Firebase user already exists - just verify it's still valid
-      const { getFirebaseAdmin } = require('@/lib/firebaseAdmin');
-      const admin = getFirebaseAdmin();
-      if (admin) {
-        try {
-          firebaseUser = await admin.auth().getUser(contact.firebaseUid);
-          console.log('✅ Using existing Firebase user:', firebaseUser.uid);
-        } catch (error) {
-          // Firebase user doesn't exist anymore - create new
-          console.warn('⚠️  Firebase user not found, creating new:', error.message);
-          const displayName = contact.firstName || contact.lastName 
-            ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
-            : null;
-          const result = await ensureFirebaseUser(email, displayName);
-          firebaseUser = result.user;
-          firebaseUserWasCreated = result.wasCreated;
-        }
-      } else {
-        // Fallback if admin not available
-        const displayName = contact.firstName || contact.lastName 
-          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
-          : null;
+      // Try to verify existing Firebase user
+      try {
+        const admin = getFirebaseAdmin();
+        firebaseUser = await admin.auth().getUser(contact.firebaseUid);
+        console.log('✅ Using existing Firebase user:', firebaseUser.uid);
+      } catch (error) {
+        // Firebase user doesn't exist anymore - create new
+        console.warn('⚠️  Firebase user not found, creating new:', error.message);
         const result = await ensureFirebaseUser(email, displayName);
         firebaseUser = result.user;
         firebaseUserWasCreated = result.wasCreated;
       }
     } else {
       // No Firebase user - create one
-      const displayName = contact.firstName || contact.lastName 
-        ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
-        : null;
       const result = await ensureFirebaseUser(email, displayName);
       firebaseUser = result.user;
       firebaseUserWasCreated = result.wasCreated;
