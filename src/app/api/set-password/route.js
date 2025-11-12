@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
+import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/set-password
- * Set password on Firebase user and mark contact as activated
+ * Set password for Firebase user and mark contact as activated
  */
 export async function POST(request) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request) {
 
     await admin.auth().updateUser(uid, { password });
 
-    // Mark contact as activated
+    // Update contact as activated (find by firebaseUid or contactId)
     if (contactId) {
       await prisma.contact.update({
         where: { id: contactId },
@@ -43,8 +43,8 @@ export async function POST(request) {
         },
       });
     } else {
-      // Fallback: find by firebaseUid
-      await prisma.contact.updateMany({
+      // Find by firebaseUid (which is unique)
+      await prisma.contact.update({
         where: { firebaseUid: uid },
         data: {
           isActivated: true,
@@ -58,7 +58,7 @@ export async function POST(request) {
       message: 'Password set successfully',
     });
   } catch (error) {
-    console.error('❌ Set password error:', error);
+    console.error('❌ SetPassword error:', error);
     return NextResponse.json(
       {
         success: false,
@@ -69,4 +69,3 @@ export async function POST(request) {
     );
   }
 }
-

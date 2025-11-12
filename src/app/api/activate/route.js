@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/activate
- * Validate invite token and return firebaseUid for password setup
+ * Verify invite token and return redirect URL for password setup
  */
 export async function POST(request) {
   try {
@@ -32,22 +32,15 @@ export async function POST(request) {
 
     if (invite.used) {
       return NextResponse.json(
-        { success: false, error: 'Token already used' },
+        { success: false, error: 'Token has already been used' },
         { status: 400 },
       );
     }
 
-    if (new Date(invite.expiresAt) < new Date()) {
+    if (invite.expiresAt < new Date()) {
       return NextResponse.json(
-        { success: false, error: 'Token expired' },
+        { success: false, error: 'Token has expired' },
         { status: 400 },
-      );
-    }
-
-    if (!invite.contact.firebaseUid) {
-      return NextResponse.json(
-        { success: false, error: 'Contact not linked to Firebase' },
-        { status: 500 },
       );
     }
 
@@ -57,8 +50,13 @@ export async function POST(request) {
       data: { used: true },
     });
 
+    // Return redirect URL with Firebase UID
+    const clientPortalUrl = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL || 'https://clientportal.ignitegrowth.biz';
+    const redirectUrl = `${clientPortalUrl}/set-password?uid=${invite.contact.firebaseUid}&email=${encodeURIComponent(invite.email)}&contactId=${invite.contactId}`;
+
     return NextResponse.json({
       success: true,
+      url: redirectUrl,
       uid: invite.contact.firebaseUid,
       email: invite.email,
       contactId: invite.contactId,
@@ -68,11 +66,10 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to activate',
+        error: 'Failed to activate token',
         details: error.message,
       },
       { status: 500 },
     );
   }
 }
-
