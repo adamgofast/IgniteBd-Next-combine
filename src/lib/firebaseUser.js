@@ -2,7 +2,7 @@ import { getFirebaseAdmin } from './firebaseAdmin';
 
 /**
  * Ensure Firebase user exists for email
- * Returns existing user or creates new one
+ * Returns { user, wasCreated: boolean }
  */
 export async function ensureFirebaseUser(email) {
   const admin = getFirebaseAdmin();
@@ -14,15 +14,17 @@ export async function ensureFirebaseUser(email) {
   
   try {
     // Try to get existing user
-    return await auth.getUserByEmail(email);
+    const user = await auth.getUserByEmail(email);
+    return { user, wasCreated: false };
   } catch (err) {
     // User doesn't exist - create new
     if (err.code === 'auth/user-not-found') {
-      return await auth.createUser({
+      const user = await auth.createUser({
         email,
         emailVerified: false,
         disabled: false,
       });
+      return { user, wasCreated: true };
     }
     throw err;
   }
