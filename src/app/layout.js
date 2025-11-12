@@ -15,11 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "Ignite BD Intelligence",
   description: "Unified product + persona intelligence stack for business development",
-  icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
-  },
 };
 
 export default function RootLayout({ children }) {
