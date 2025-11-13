@@ -7,6 +7,10 @@
 
 import { prisma } from '@/lib/prisma';
 import { inferDomainFromEmail } from '@/lib/utils/inferDomain';
+import {
+  findCompanyHQByEmail,
+  registerDomain,
+} from '@/lib/services/domainRegistryService';
 
 interface UpsertContactData {
   email: string;
@@ -68,26 +72,31 @@ export async function upsertContactWithDomain(
   // Determine CompanyHQId (crmId)
   let crmId = data?.crmId || options.companyHQId;
   
-  // If associateCompanyHQ is enabled and no crmId provided, try to find by domain
+  // If associateCompanyHQ is enabled and no crmId provided, try to find by domain via Domain Registry
   if (options.associateCompanyHQ && !crmId && domain) {
-    const matchingHQ = await prisma.companyHQ.findFirst({
-      where: {
-        companyWebsite: {
-          contains: domain,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
+    const domainEntry = await findCompanyHQByEmail(normalizedEmail, { updateLastSeen: true });
     
-    if (matchingHQ) {
-      crmId = matchingHQ.id;
+    if (domainEntry?.companyHQ) {
+      crmId = domainEntry.companyHQ.id;
     }
   }
   
   if (!crmId) {
     throw new Error('CompanyHQId (crmId) is required. Provide it in data.crmId or options.companyHQId');
+  }
+
+  // Auto-register domain in Domain Registry if we have domain and crmId
+  if (domain && crmId) {
+    try {
+      await registerDomain(domain, {
+        companyHqId: crmId,
+        normalizedName: data?.companyName || null,
+        confidenceScore: data?.crmId ? 1.0 : 0.8, // Higher confidence if explicitly provided
+      });
+    } catch (error) {
+      // Log but don't fail - domain registration is optional
+      console.warn(`⚠️ Failed to register domain ${domain} for CompanyHQ ${crmId}:`, error);
+    }
   }
 
   // Prepare upsert data

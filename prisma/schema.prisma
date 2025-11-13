@@ -82,6 +82,7 @@ model CompanyHQ {
   personas         Persona[]
   assessments      Assessment[]
   memberships      CompanyMembership[] // Junction table for multi-HQ access
+  domainRegistry   DomainRegistry? // Domain registry entry (one-to-one)
 
   @@map("company_hqs")
 }
@@ -167,7 +168,24 @@ model Contact {
   @@index([firebaseUid])
   @@index([ownerId])
   @@index([role])
+  @@index([domain])
   @@map("contacts")
+}
+
+model DomainRegistry {
+  id              String     @id @default(cuid())
+  domain          String     @unique // Normalized domain (e.g., "businesspointlaw.com")
+  normalizedName  String? // Normalized company name (e.g., "Business Point Law")
+  companyHqId     String     @unique // CompanyHQ this domain belongs to
+  firstSeen       DateTime   @default(now())
+  lastSeen        DateTime   @updatedAt
+  confidenceScore Float?     @default(1.0) // Confidence that this domain belongs to this CompanyHQ
+
+  companyHQ       CompanyHQ  @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+
+  @@index([domain])
+  @@index([companyHqId])
+  @@map("domain_registry")
 }
 
 model Product {
