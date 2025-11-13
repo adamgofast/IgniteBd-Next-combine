@@ -135,6 +135,7 @@ model Contact {
   howMet              String?
   notes               String? // Notes/context about the contact
   contactListId       String?
+  domain              String? // Domain inferred from email (e.g., "businesspointlaw.com")
   companyName         String? // Company name from enrichment
   enrichmentSource    String? // Source of enrichment (e.g., "Lusha")
   enrichmentFetchedAt DateTime? // When enrichment was fetched
