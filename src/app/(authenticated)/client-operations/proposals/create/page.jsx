@@ -310,7 +310,6 @@ export default function CreateProposalPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Create Proposal"
-          subtitle="Single-page proposal creation"
           backTo="/client-operations/proposals"
           backLabel="Back to Proposals"
         />
@@ -321,11 +320,11 @@ export default function CreateProposalPage() {
           </div>
         )}
 
-        <div className="mt-8 space-y-8">
-          {/* 1. Contact & Company */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <User className="h-6 w-6 text-red-600" />
+        <div className="mt-8 space-y-6">
+          {/* Contact & Company */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <User className="h-5 w-5 text-red-600" />
               Contact & Company
             </h2>
 
@@ -453,10 +452,10 @@ export default function CreateProposalPage() {
             </div>
           </section>
 
-          {/* 2. Proposal Title & Purpose */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <FileText className="h-6 w-6 text-red-600" />
+          {/* Proposal Title & Purpose */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-red-600" />
               Proposal Title & Purpose
             </h2>
             <div className="space-y-4">
@@ -487,11 +486,11 @@ export default function CreateProposalPage() {
             </div>
           </section>
 
-          {/* 3. Services */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Package className="h-6 w-6 text-red-600" />
+          {/* Services */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Package className="h-5 w-5 text-red-600" />
                 Services
               </h2>
               <div className="flex gap-2">
@@ -596,11 +595,11 @@ export default function CreateProposalPage() {
             )}
           </section>
 
-          {/* 4. Phases */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-red-600" />
+          {/* Phases */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-red-600" />
                 Phases
               </h2>
               <button
@@ -734,10 +733,10 @@ export default function CreateProposalPage() {
             </div>
           </section>
 
-          {/* 5. Compensation */}
-          <section className="rounded-2xl bg-white p-8 shadow">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <DollarSign className="h-6 w-6 text-red-600" />
+          {/* Compensation */}
+          <section className="rounded-2xl bg-white p-6 shadow">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-red-600" />
               Compensation
             </h2>
             <div className="space-y-4">
