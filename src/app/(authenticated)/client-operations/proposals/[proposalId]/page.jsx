@@ -237,25 +237,14 @@ export default function ProposalDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Single Page Scroll Content */}
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 space-y-12">
-        {/* Purpose Section */}
+      {/* Single Page Vertical Scroll - All Sections Visible */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        {/* Purpose Section - Always Visible, Inline Editable */}
         <section className="rounded-2xl bg-white p-8 shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FileText className="h-6 w-6 text-red-600" />
-              Purpose
-            </h2>
-            {editing !== 'purpose' && (
-              <button
-                onClick={() => setEditing('purpose')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <FileText className="h-6 w-6 text-red-600" />
+            Purpose
+          </h2>
           {editing === 'purpose' ? (
             <div className="space-y-3">
               <textarea
@@ -264,8 +253,9 @@ export default function ProposalDetailPage({ params }) {
                   setLocalData((prev) => ({ ...prev, purpose: e.target.value }))
                 }
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                rows={4}
+                rows={6}
                 placeholder="Define the purpose and goals of this proposal..."
+                autoFocus
               />
               <div className="flex gap-3">
                 <button
@@ -289,29 +279,29 @@ export default function ProposalDetailPage({ params }) {
               </div>
             </div>
           ) : (
-            <p className="text-gray-700 leading-relaxed">
-              {proposal.purpose || 'No purpose defined. Click Edit to add one.'}
-            </p>
+            <div 
+              onClick={() => proposal.status !== 'approved' && setEditing('purpose')}
+              className={`group cursor-pointer rounded-lg border-2 border-dashed border-transparent p-4 transition hover:border-gray-300 ${proposal.status === 'approved' ? 'cursor-default' : ''}`}
+            >
+              <p className="text-gray-700 leading-relaxed min-h-[60px]">
+                {proposal.purpose || 'Click to add purpose...'}
+              </p>
+              {proposal.status !== 'approved' && (
+                <button className="mt-2 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition">
+                  <Edit2 className="h-3 w-3 inline mr-1" />
+                  Click to edit
+                </button>
+              )}
+            </div>
           )}
         </section>
 
-        {/* Services Section - Inline Editing */}
+        {/* Services Section - Always Visible */}
         <section className="rounded-2xl bg-white p-8 shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Package className="h-6 w-6 text-red-600" />
-              Services
-            </h2>
-            {editing !== 'services' && (
-              <button
-                onClick={() => setEditing('services')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Package className="h-6 w-6 text-red-600" />
+            Services
+          </h2>
           {editing === 'services' ? (
             <ServicesInlineEditor
               services={serviceInstances}
@@ -338,58 +328,51 @@ export default function ProposalDetailPage({ params }) {
               }}
               saving={saving}
             />
-          ) : serviceInstances.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {serviceInstances.map((service, index) => (
-                <div
-                  key={index}
-                  className="rounded-lg border border-gray-200 p-4 hover:border-red-300 transition"
-                >
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {service.name || service.title || `Service ${index + 1}`}
-                  </h3>
-                  {service.description && (
-                    <p className="text-sm text-gray-600 mb-2">{service.description}</p>
-                  )}
-                  {service.price && (
-                    <p className="text-lg font-bold text-red-600">
-                      ${service.price.toLocaleString()}
-                    </p>
+          ) : (
+            <div 
+              onClick={() => proposal.status !== 'approved' && setEditing('services')}
+              className={`group ${proposal.status !== 'approved' ? 'cursor-pointer' : ''}`}
+            >
+              {serviceInstances.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {serviceInstances.map((service, index) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-gray-200 p-4 hover:border-red-300 transition"
+                    >
+                      <h3 className="font-semibold text-gray-900 mb-1">
+                        {service.name || service.title || `Service ${index + 1}`}
+                      </h3>
+                      {service.description && (
+                        <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                      )}
+                      {service.price && (
+                        <p className="text-lg font-bold text-red-600">
+                          ${service.price.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg group-hover:border-red-300 transition">
+                  <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No services added yet.</p>
+                  {proposal.status !== 'approved' && (
+                    <p className="text-xs mt-2 text-gray-400">Click to add services</p>
                   )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p>No services added yet.</p>
-              <button
-                onClick={() => setEditing('services')}
-                className="mt-4 text-red-600 hover:text-red-700 font-semibold"
-              >
-                Add Services →
-              </button>
+              )}
             </div>
           )}
         </section>
 
         {/* Scope of Work - Phases */}
         <section className="rounded-2xl bg-white p-8 shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Calendar className="h-6 w-6 text-red-600" />
-              Scope of Work
-            </h2>
-            {editing !== 'phases' && proposal.status !== 'approved' && (
-              <button
-                onClick={() => setEditing('phases')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-red-600" />
+            Scope of Work
+          </h2>
           {editing === 'phases' ? (
             <PhasesInlineEditor
               phases={phases}
@@ -417,75 +400,91 @@ export default function ProposalDetailPage({ params }) {
               }}
               saving={saving}
             />
-          ) : phases.length > 0 ? (
-            <div className="space-y-4">
-              {phases.map((phase, index) => {
-                const colorClasses = {
-                  red: 'border-red-200 bg-red-50',
-                  yellow: 'border-yellow-200 bg-yellow-50',
-                  purple: 'border-purple-200 bg-purple-50',
-                };
-                const colorClass =
-                  colorClasses[phase.color] || colorClasses.red;
-                return (
-                  <div
-                    key={phase.id || index}
-                    className={`rounded-lg border p-6 ${colorClass}`}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {phase.name || `Phase ${index + 1}`}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {phase.weeks || 'Duration TBD'}
-                        </p>
-                      </div>
-                    </div>
-                    {phase.goal && (
-                      <p className="text-gray-700 mb-3">
-                        <strong>Goal:</strong> {phase.goal}
-                      </p>
-                    )}
-                    {phase.deliverables && Array.isArray(phase.deliverables) && (
-                      <div className="mb-3">
-                        <p className="text-sm font-semibold text-gray-700 mb-2">
-                          Deliverables:
-                        </p>
-                        <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                          {phase.deliverables.map((deliverable, delIndex) => (
-                            <li key={delIndex}>
-                              {typeof deliverable === 'string'
-                                ? deliverable
-                                : deliverable.title || deliverable}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {phase.outcome && (
-                      <p className="text-sm text-gray-600">
-                        <strong>Outcome:</strong> {phase.outcome}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p>No phases defined yet.</p>
-              <p className="text-sm mt-2">
-                Phases define the scope of work and deliverables.
-              </p>
-              {proposal.status !== 'approved' && (
-                <button
-                  onClick={() => setEditing('phases')}
-                  className="mt-4 text-red-600 hover:text-red-700 font-semibold"
-                >
-                  Add Phases →
-                </button>
+            <div 
+              onClick={() => proposal.status !== 'approved' && setEditing('phases')}
+              className={`group ${proposal.status !== 'approved' ? 'cursor-pointer' : ''}`}
+            >
+              {phases.length > 0 ? (
+                <div className="space-y-4">
+                  {phases.map((phase, index) => {
+                    const colorClasses = {
+                      red: 'border-red-200 bg-red-50',
+                      yellow: 'border-yellow-200 bg-yellow-50',
+                      purple: 'border-purple-200 bg-purple-50',
+                    };
+                    const colorClass =
+                      colorClasses[phase.color] || colorClasses.red;
+                    return (
+                      <div
+                        key={phase.id || index}
+                        className={`rounded-lg border p-6 ${colorClass}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-900">
+                              {phase.name || `Phase ${index + 1}`}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {phase.weeks || 'Duration TBD'}
+                            </p>
+                          </div>
+                        </div>
+                        {phase.goal && (
+                          <p className="text-gray-700 mb-3">
+                            <strong>Goal:</strong> {phase.goal}
+                          </p>
+                        )}
+                        {phase.deliverables && Array.isArray(phase.deliverables) && phase.deliverables.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">
+                              Deliverables:
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                              {phase.deliverables.map((deliverable, delIndex) => (
+                                <li key={delIndex}>
+                                  {typeof deliverable === 'string'
+                                    ? deliverable
+                                    : deliverable.title || deliverable}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {phase.coreWork && Array.isArray(phase.coreWork) && phase.coreWork.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-sm font-semibold text-gray-700 mb-2">
+                              Core Work:
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                              {phase.coreWork.map((work, workIndex) => (
+                                <li key={workIndex}>
+                                  {typeof work === 'string' ? work : work.title || work}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {phase.outcome && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Outcome:</strong> {phase.outcome}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg group-hover:border-red-300 transition">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No phases defined yet.</p>
+                  <p className="text-sm mt-2">
+                    Phases define the scope of work and deliverables.
+                  </p>
+                  {proposal.status !== 'approved' && (
+                    <p className="text-xs mt-2 text-gray-400">Click to add phases</p>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -493,21 +492,10 @@ export default function ProposalDetailPage({ params }) {
 
         {/* Compensation Section */}
         <section className="rounded-2xl bg-white p-8 shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <DollarSign className="h-6 w-6 text-red-600" />
-              Compensation
-            </h2>
-            {editing !== 'compensation' && proposal.status !== 'approved' && (
-              <button
-                onClick={() => setEditing('compensation')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <DollarSign className="h-6 w-6 text-red-600" />
+            Compensation
+          </h2>
           {editing === 'compensation' ? (
             <CompensationEditor
               compensation={compensation}
@@ -592,21 +580,10 @@ export default function ProposalDetailPage({ params }) {
 
         {/* Timeline - Milestones */}
         <section className="rounded-2xl bg-white p-8 shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Clock className="h-6 w-6 text-red-600" />
-              Timeline & Milestones
-            </h2>
-            {editing !== 'milestones' && proposal.status !== 'approved' && (
-              <button
-                onClick={() => setEditing('milestones')}
-                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-              >
-                <Edit2 className="h-4 w-4" />
-                Edit
-              </button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Clock className="h-6 w-6 text-red-600" />
+            Timeline & Milestones
+          </h2>
           {editing === 'milestones' ? (
             <MilestonesInlineEditor
               milestones={milestones}
@@ -635,69 +612,71 @@ export default function ProposalDetailPage({ params }) {
               }}
               saving={saving}
             />
-          ) : milestones.length > 0 ? (
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-              <div className="space-y-6">
-                {milestones.map((milestone, index) => {
-                  const phaseColors = {
-                    red: 'bg-red-500',
-                    yellow: 'bg-yellow-500',
-                    purple: 'bg-purple-500',
-                  };
-                  const dotColor =
-                    phaseColors[milestone.phaseColor] || phaseColors.red;
-                  return (
-                    <div key={milestone.week || index} className="relative flex gap-6">
-                      {/* Timeline dot */}
-                      <div
-                        className={`relative z-10 h-4 w-4 rounded-full ${dotColor} mt-1`}
-                      ></div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <span className="font-semibold text-gray-900">
-                                Week {milestone.week || index + 1}
-                              </span>
-                              {milestone.phase && (
-                                <span className="text-sm text-gray-600">
-                                  • {milestone.phase}
-                                </span>
+          ) : (
+            <div 
+              onClick={() => proposal.status !== 'approved' && setEditing('milestones')}
+              className={`group ${proposal.status !== 'approved' ? 'cursor-pointer' : ''}`}
+            >
+              {milestones.length > 0 ? (
+                <div className="relative">
+                  {/* Timeline line */}
+                  <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                  <div className="space-y-6">
+                    {milestones.map((milestone, index) => {
+                      const phaseColors = {
+                        red: 'bg-red-500',
+                        yellow: 'bg-yellow-500',
+                        purple: 'bg-purple-500',
+                      };
+                      const dotColor =
+                        phaseColors[milestone.phaseColor] || phaseColors.red;
+                      return (
+                        <div key={milestone.week || index} className="relative flex gap-6">
+                          {/* Timeline dot */}
+                          <div
+                            className={`relative z-10 h-4 w-4 rounded-full ${dotColor} mt-1`}
+                          ></div>
+                          <div className="flex-1 pb-6">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-3 mb-1">
+                                  <span className="font-semibold text-gray-900">
+                                    Week {milestone.week || index + 1}
+                                  </span>
+                                  {milestone.phase && (
+                                    <span className="text-sm text-gray-600">
+                                      • {milestone.phase}
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                                  {milestone.milestone || `Milestone ${index + 1}`}
+                                </h3>
+                                {milestone.deliverable && (
+                                  <p className="text-gray-600">{milestone.deliverable}</p>
+                                )}
+                              </div>
+                              {milestone.completed && (
+                                <CheckCircle className="h-5 w-5 text-green-600" />
                               )}
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                              {milestone.milestone || `Milestone ${index + 1}`}
-                            </h3>
-                            {milestone.deliverable && (
-                              <p className="text-gray-600">{milestone.deliverable}</p>
-                            )}
                           </div>
-                          {milestone.completed && (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          )}
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Clock className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p>No milestones defined yet.</p>
-              <p className="text-sm mt-2">
-                Milestones help track progress through the engagement.
-              </p>
-              {proposal.status !== 'approved' && (
-                <button
-                  onClick={() => setEditing('milestones')}
-                  className="mt-4 text-red-600 hover:text-red-700 font-semibold"
-                >
-                  Add Milestones →
-                </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg group-hover:border-red-300 transition">
+                  <Clock className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No milestones defined yet.</p>
+                  <p className="text-sm mt-2">
+                    Milestones help track progress through the engagement.
+                  </p>
+                  {proposal.status !== 'approved' && (
+                    <p className="text-xs mt-2 text-gray-400">Click to add milestones</p>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -739,6 +718,197 @@ export default function ProposalDetailPage({ params }) {
   );
 }
 
+// Services Inline Editor Component
+function ServicesInlineEditor({ services, onSave, onCancel, saving }) {
+  const [localServices, setLocalServices] = useState(services || []);
+  const [editingIndex, setEditingIndex] = useState(null);
+
+  const handleAddService = () => {
+    const newService = {
+      name: '',
+      description: '',
+      price: 0,
+      category: 'general',
+    };
+    setLocalServices([...localServices, newService]);
+    setEditingIndex(localServices.length);
+  };
+
+  const handleUpdateService = (index, field, value) => {
+    const updated = [...localServices];
+    updated[index] = { ...updated[index], [field]: value };
+    setLocalServices(updated);
+  };
+
+  const handleDeleteService = (index) => {
+    if (!confirm('Delete this service?')) return;
+    setLocalServices(localServices.filter((_, i) => i !== index));
+    if (editingIndex === index) {
+      setEditingIndex(null);
+    }
+  };
+
+  const calculateTotal = () => {
+    return localServices.reduce((sum, service) => sum + (parseFloat(service.price) || 0), 0);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {localServices.length} {localServices.length === 1 ? 'service' : 'services'} • Total: ${calculateTotal().toLocaleString()}
+        </p>
+        <button
+          onClick={handleAddService}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add Service
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {localServices.map((service, index) => (
+          <div key={index} className="rounded-lg border border-gray-200 p-4">
+            {editingIndex === index ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Service Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={service.name || ''}
+                    onChange={(e) => handleUpdateService(index, 'name', e.target.value)}
+                    placeholder="e.g., Strategy Consulting"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-700">
+                    Description
+                  </label>
+                  <textarea
+                    value={service.description || ''}
+                    onChange={(e) => handleUpdateService(index, 'description', e.target.value)}
+                    placeholder="Describe what this service includes..."
+                    rows={3}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-700">Price *</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-xs text-gray-500">$</span>
+                      <input
+                        type="number"
+                        value={service.price || 0}
+                        onChange={(e) =>
+                          handleUpdateService(index, 'price', parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full rounded border border-gray-300 pl-6 pr-2 py-1.5 text-sm"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-gray-700">
+                      Category
+                    </label>
+                    <select
+                      value={service.category || 'general'}
+                      onChange={(e) => handleUpdateService(index, 'category', e.target.value)}
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      <option value="general">General</option>
+                      <option value="strategy">Strategy</option>
+                      <option value="implementation">Implementation</option>
+                      <option value="support">Support</option>
+                      <option value="training">Training</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingIndex(null)}
+                    className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+                  >
+                    <X className="h-3 w-3" />
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="font-semibold text-gray-900">
+                      {service.name || `Service ${index + 1}`}
+                    </h3>
+                    {service.category && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                        {service.category}
+                      </span>
+                    )}
+                  </div>
+                  {service.description && (
+                    <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                  )}
+                  <p className="text-lg font-bold text-red-600">
+                    ${(parseFloat(service.price) || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingIndex(index)}
+                    className="rounded-lg bg-gray-100 p-1.5 text-gray-700 transition hover:bg-gray-200"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteService(index)}
+                    className="rounded-lg bg-red-100 p-1.5 text-red-700 transition hover:bg-red-200"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {localServices.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <p className="text-sm">No services added yet.</p>
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-4 border-t">
+        <button
+          onClick={() => onSave(localServices)}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+        >
+          <Save className="h-4 w-4" />
+          Save All
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+        >
+          <X className="h-4 w-4" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Phases Inline Editor Component
 function PhasesInlineEditor({ phases, onSave, onCancel, saving }) {
   const [localPhases, setLocalPhases] = useState(phases || []);
@@ -753,6 +923,7 @@ function PhasesInlineEditor({ phases, onSave, onCancel, saving }) {
         color: localPhases.length === 0 ? 'red' : localPhases.length === 1 ? 'yellow' : 'purple',
         goal: '',
         deliverables: [],
+        coreWork: [],
         outcome: '',
       },
     ]);
@@ -801,6 +972,46 @@ function PhasesInlineEditor({ phases, onSave, onCancel, saving }) {
           const deliverables = [...(p.deliverables || [])];
           deliverables.splice(index, 1);
           return { ...p, deliverables };
+        }
+        return p;
+      }),
+    );
+  };
+
+  const handleAddCoreWork = (phaseId) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          return {
+            ...p,
+            coreWork: [...(p.coreWork || []), ''],
+          };
+        }
+        return p;
+      }),
+    );
+  };
+
+  const handleUpdateCoreWork = (phaseId, index, value) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          const coreWork = [...(p.coreWork || [])];
+          coreWork[index] = value;
+          return { ...p, coreWork };
+        }
+        return p;
+      }),
+    );
+  };
+
+  const handleRemoveCoreWork = (phaseId, index) => {
+    setLocalPhases(
+      localPhases.map((p) => {
+        if (p.id === phaseId) {
+          const coreWork = [...(p.coreWork || [])];
+          coreWork.splice(index, 1);
+          return { ...p, coreWork };
         }
         return p;
       }),
@@ -907,6 +1118,41 @@ function PhasesInlineEditor({ phases, onSave, onCancel, saving }) {
                         />
                         <button
                           onClick={() => handleRemoveDeliverable(phase.id, delIndex)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      Core Work
+                    </label>
+                    <button
+                      onClick={() => handleAddCoreWork(phase.id)}
+                      className="text-xs text-red-600 hover:text-red-700"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(phase.coreWork || []).map((work, workIndex) => (
+                      <div key={workIndex} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={work}
+                          onChange={(e) =>
+                            handleUpdateCoreWork(phase.id, workIndex, e.target.value)
+                          }
+                          placeholder="e.g., Configure IgniteBD CRM + domain layer"
+                          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
+                        />
+                        <button
+                          onClick={() => handleRemoveCoreWork(phase.id, workIndex)}
                           className="text-red-600 hover:text-red-700"
                         >
                           <X className="h-4 w-4" />

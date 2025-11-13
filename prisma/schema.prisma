@@ -68,17 +68,20 @@ model CompanyHQ {
   teamSize         String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  ownerId          String
+  ownerId          String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
+  contactOwnerId   String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
   managerId        String?
   companies        Company[]
   manager          Owner?        @relation("ManagerOf", fields: [managerId], references: [id])
-  owner            Owner         @relation("OwnerOf", fields: [ownerId], references: [id])
+  owner            Owner?       @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
+  contactOwner     Contact?      @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
   contactLists     ContactList[]
   contacts         Contact[]
   proposals        Proposal[]
   products         Product[]
   personas         Persona[]
   assessments      Assessment[]
+  memberships      CompanyMembership[] // Junction table for multi-HQ access
 
   @@map("company_hqs")
 }
@@ -145,6 +148,10 @@ model Contact {
   isActivated        Boolean  @default(false) // Has completed activation flow
   activatedAt        DateTime? // When activation was completed
   
+  // Elevation to Owner
+  ownerId             String? // Contact.id (self-reference when they become owner of their own HQ)
+  role                String   @default("contact") // "contact" | "owner"
+  
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   companyHQ           CompanyHQ    @relation(fields: [crmId], references: [id])
@@ -153,9 +160,13 @@ model Contact {
   pipeline            Pipeline?
   deliverables        ConsultantDeliverable[]
   invites             InviteToken[] // Invite tokens for activation
+  ownedHQs            CompanyHQ[]  @relation("ContactOwnedHQs") // HQs owned by this Contact
+  // Note: memberships are queried via firebaseUid, not direct relation (due to nullable firebaseUid)
 
   @@index([email])
   @@index([firebaseUid])
+  @@index([ownerId])
+  @@index([role])
   @@map("contacts")
 }
 
@@ -358,4 +369,23 @@ model InviteToken {
   @@index([contactId])
   @@index([email])
   @@map("invite_tokens")
+}
+
+model CompanyMembership {
+  id           String   @id @default(cuid())
+  userId       String   // Contact.firebaseUid (maps to Firebase Auth UID) - stored as string
+  companyHqId  String
+  role         String   // "client" | "owner" | "admin"
+  isPrimary    Boolean  @default(false) // Primary HQ for this user
+  createdAt    DateTime @default(now())
+
+  // Note: userId stores firebaseUid as string - query Contact manually via firebaseUid
+  // Prisma doesn't support relations on nullable unique fields easily
+  companyHQ    CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyHqId])
+  @@index([userId, companyHqId])
+  @@unique([userId, companyHqId]) // Prevent duplicate memberships
+  @@map("company_memberships")
 }

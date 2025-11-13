@@ -2,6 +2,22 @@ import { NextResponse } from 'next/server';
 import { getFirebaseAdmin } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 
+// CORS headers for client portal
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://clientportal.ignitegrowth.biz',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+/**
+ * OPTIONS /api/set-password
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/set-password
  * Set password for Firebase user and mark contact as activated
@@ -14,14 +30,14 @@ export async function POST(request) {
     if (!uid || !password) {
       return NextResponse.json(
         { success: false, error: 'uid and password are required' },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
     if (password.length < 8) {
       return NextResponse.json(
         { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -53,10 +69,13 @@ export async function POST(request) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Password set successfully',
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Password set successfully',
+      },
+      { headers: corsHeaders },
+    );
   } catch (error) {
     console.error('❌ SetPassword error:', error);
     return NextResponse.json(
@@ -65,7 +84,7 @@ export async function POST(request) {
         error: 'Failed to set password',
         details: error.message,
       },
-      { status: 500 },
+      { status: 500, headers: corsHeaders },
     );
   }
 }
