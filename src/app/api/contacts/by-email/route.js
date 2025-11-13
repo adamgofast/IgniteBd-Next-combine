@@ -48,24 +48,12 @@ export async function GET(request) {
 
     console.log('🔍 Searching for contact with email:', email.toLowerCase().trim());
     
+    // Only select fields that definitely exist - don't use include/select that might fail
     const contact = await prisma.contact.findFirst({
       where: {
         email: email.toLowerCase().trim(),
       },
-      include: {
-        contactCompany: {
-          select: {
-            id: true,
-            companyName: true,
-          },
-        },
-        pipeline: {
-          select: {
-            pipeline: true,
-            stage: true,
-          },
-        },
-      },
+      // Don't use include - just get the contact, then manually get relations if needed
     });
     
     console.log('✅ Contact found:', contact ? contact.id : 'null');
@@ -78,18 +66,18 @@ export async function GET(request) {
       );
     }
 
+    // Return only the essential fields - don't try to access relations that might not exist
     return corsResponse(
       {
         success: true,
         contact: {
           id: contact.id,
-          firstName: contact.firstName,
-          lastName: contact.lastName,
+          firstName: contact.firstName || null,
+          lastName: contact.lastName || null,
           email: contact.email,
           crmId: contact.crmId,
-          contactCompanyId: contact.contactCompanyId,
-          contactCompany: contact.contactCompany,
-          pipeline: contact.pipeline,
+          contactCompanyId: contact.contactCompanyId || null,
+          // Don't include relations - they can be fetched separately if needed
         },
       },
       200,
