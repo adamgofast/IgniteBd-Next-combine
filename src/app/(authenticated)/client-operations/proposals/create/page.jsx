@@ -329,8 +329,9 @@ export default function CreateProposalPage() {
               Contact & Company
             </h2>
 
-            {selectedContact && selectedCompany ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+            {/* Selected Contact Display */}
+            {selectedContact && selectedCompany && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
@@ -359,94 +360,97 @@ export default function CreateProposalPage() {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search contacts by name, email, or company..."
-                      value={contactSearch}
-                      onChange={(e) => setContactSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                    />
-                  </div>
-                  <button
-                    onClick={() => registry.loadFromCache()}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
-                  {companyHQId && (
-                    <button
-                      onClick={fetchContacts}
-                      disabled={loadingContacts}
-                      className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 text-blue-600"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
-                    </button>
-                  )}
+            )}
+
+            {/* Contact Search */}
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search contacts by name, email, or company..."
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  />
                 </div>
-
-                {availableContacts.length > 0 && (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {availableContacts.map((contact) => (
-                      <button
-                        key={contact.id}
-                        onClick={() => handleContactSelect(contact)}
-                        className="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-red-300 hover:bg-red-50 transition"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                            <User className="h-5 w-5 text-red-600" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">
-                              {contact.firstName} {contact.lastName}
-                            </p>
-                            {contact.email && (
-                              <p className="text-sm text-gray-600">{contact.email}</p>
-                            )}
-                            {contact.contactCompany?.companyName && (
-                              <p className="text-xs text-gray-500">{contact.contactCompany.companyName}</p>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {selectedContact && !selectedCompany && (
-                  <div className="pt-4 border-t">
-                    <p className="mb-2 text-sm text-gray-600">Confirm company name:</p>
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={companyNameInput}
-                        onChange={(e) => setCompanyNameInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && companyNameInput.trim()) {
-                            handleCompanyConfirm();
-                          }
-                        }}
-                        placeholder="Company name"
-                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                        disabled={loadingCompany}
-                      />
-                      <button
-                        onClick={handleCompanyConfirm}
-                        disabled={loadingCompany || !companyNameInput.trim()}
-                        className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                      >
-                        {loadingCompany ? 'Confirming...' : 'Confirm'}
-                      </button>
-                    </div>
-                  </div>
+                <button
+                  onClick={() => registry.loadFromCache()}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+                {companyHQId && (
+                  <button
+                    onClick={fetchContacts}
+                    disabled={loadingContacts}
+                    className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 text-blue-600"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
+                  </button>
                 )}
               </div>
-            )}
+
+              {/* Contact List */}
+              {availableContacts.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableContacts.map((contact) => (
+                    <button
+                      key={contact.id}
+                      onClick={() => handleContactSelect(contact)}
+                      className="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-red-300 hover:bg-red-50 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                          <User className="h-5 w-5 text-red-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {contact.firstName} {contact.lastName}
+                          </p>
+                          {contact.email && (
+                            <p className="text-sm text-gray-600">{contact.email}</p>
+                          )}
+                          {contact.contactCompany?.companyName && (
+                            <p className="text-xs text-gray-500">{contact.contactCompany.companyName}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Company Confirmation */}
+              {selectedContact && !selectedCompany && (
+                <div className="pt-4 border-t">
+                  <p className="mb-2 text-sm text-gray-600">Confirm company name:</p>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={companyNameInput}
+                      onChange={(e) => setCompanyNameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && companyNameInput.trim()) {
+                          handleCompanyConfirm();
+                        }
+                      }}
+                      placeholder="Company name"
+                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      disabled={loadingCompany}
+                    />
+                    <button
+                      onClick={handleCompanyConfirm}
+                      disabled={loadingCompany || !companyNameInput.trim()}
+                      className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {loadingCompany ? 'Confirming...' : 'Confirm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
 
           {/* 2. Proposal Title & Purpose */}
