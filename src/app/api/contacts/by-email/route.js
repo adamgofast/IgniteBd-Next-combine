@@ -48,12 +48,11 @@ export async function GET(request) {
 
     console.log('🔍 Searching for contact with email:', email.toLowerCase().trim());
     
-    // Only select fields that definitely exist - don't use include/select that might fail
-    const contact = await prisma.contact.findFirst({
+    // Use findUnique since email is unique - faster and more accurate
+    const contact = await prisma.contact.findUnique({
       where: {
         email: email.toLowerCase().trim(),
       },
-      // Don't use include - just get the contact, then manually get relations if needed
     });
     
     console.log('✅ Contact found:', contact ? contact.id : 'null');
