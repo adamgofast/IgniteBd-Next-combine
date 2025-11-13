@@ -33,10 +33,22 @@ export async function POST(request) {
       );
     }
 
-    // Find invite token
+    // Find invite token - only select firebaseUid from contact
     const invite = await prisma.inviteToken.findUnique({
       where: { token },
-      include: { contact: true },
+      select: {
+        id: true,
+        contactId: true,
+        email: true,
+        token: true,
+        used: true,
+        expiresAt: true,
+        contact: {
+          select: {
+            firebaseUid: true,
+          },
+        },
+      },
     });
 
     if (!invite) {
