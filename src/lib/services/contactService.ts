@@ -113,14 +113,15 @@ export async function upsertContactWithDomain(
   };
 
   // Upsert contact (create or update by email)
+  const { crmId: _, ...updateData } = upsertData; // Remove crmId from update data
+  
   const contact = await prisma.contact.upsert({
     where: {
       email: normalizedEmail,
     },
     update: {
-      // Update all fields except crmId (tenant identifier shouldn't change)
-      ...upsertData,
-      crmId: undefined, // Don't update crmId on existing contacts
+      // Update all fields except crmId (tenant identifier shouldn't change on existing contacts)
+      ...updateData,
     },
     create: upsertData,
     include: {
