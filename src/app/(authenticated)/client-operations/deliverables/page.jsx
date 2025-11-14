@@ -15,6 +15,7 @@ export default function DeliverablesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
   const [companyHQId, setCompanyHQId] = useState('');
+  const [viewMode, setViewMode] = useState('fork'); // 'fork' | 'work-package'
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -171,68 +172,87 @@ export default function DeliverablesPage() {
           )}
         </div>
 
-        {/* Build Actions */}
-        {selectedContact && (
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => router.push(`/client-operations/deliverables/client-persona-build?contactId=${selectedContact.id}`)}
-              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
-            >
-              <div className="mb-2 text-sm font-semibold text-gray-900">Build Persona</div>
-              <div className="text-xs text-gray-500">Create a target persona for this contact</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/client-operations/deliverables/client-blog-build?contactId=${selectedContact.id}`)}
-              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
-            >
-              <div className="mb-2 text-sm font-semibold text-gray-900">Build Blog</div>
-              <div className="text-xs text-gray-500">Create blog content for this contact</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(`/client-operations/deliverables/client-upload?contactId=${selectedContact.id}`)}
-              className="rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
-            >
-              <div className="mb-2 text-sm font-semibold text-gray-900">Upload Work</div>
-              <div className="text-xs text-gray-500">Upload or paste work content</div>
-            </button>
+        {/* Fork: Create Work Page OR View Work Package */}
+        {selectedContact && viewMode === 'fork' && (
+          <div className="mt-8 grid gap-6 md:grid-cols-2">
+            {/* Create a Work Page */}
+            <div className="rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-sm transition hover:border-red-300 hover:shadow-md">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="rounded-lg bg-red-100 p-3">
+                  <Plus className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Create a Work Page</h3>
+                  <p className="text-sm text-gray-500">Set up deliverables for this contact</p>
+                </div>
+              </div>
+              <p className="mb-6 text-sm text-gray-600">
+                Pull from proposal or start fresh. Build your list of deliverables and then start working.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(`/client-operations/deliverables/create-work?contactId=${selectedContact.id}`)}
+                className="w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Create Work Page →
+              </button>
+            </div>
+
+            {/* View Work Package */}
+            <div className="rounded-2xl border-2 border-gray-200 bg-white p-8 shadow-sm transition hover:border-red-300 hover:shadow-md">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="rounded-lg bg-blue-100 p-3">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">View Work Package</h3>
+                  <p className="text-sm text-gray-500">
+                    {deliverables.length > 0 
+                      ? `${deliverables.length} deliverable${deliverables.length !== 1 ? 's' : ''} set up`
+                      : 'No deliverables yet'}
+                  </p>
+                </div>
+              </div>
+              <p className="mb-6 text-sm text-gray-600">
+                Click through existing deliverables to view work artifacts and manage progress.
+              </p>
+              {deliverables.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('work-package')}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  View Work Package →
+                </button>
+              ) : (
+                <div className="w-full rounded-lg bg-gray-100 px-4 py-3 text-center text-sm font-semibold text-gray-500">
+                  Create work page first
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Deliverables List */}
-        <div className="mt-8">
-          {!selectedContact ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Select a Contact
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Select a contact above to view and manage their deliverables.
-              </p>
+        {/* Deliverables List (Work Package View) */}
+        {selectedContact && viewMode === 'work-package' && deliverables.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Work Package</h2>
+              <button
+                type="button"
+                onClick={() => setViewMode('fork')}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                ← Back to options
+              </button>
             </div>
-          ) : loading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Loading deliverables...</p>
-            </div>
-          ) : deliverables.length === 0 ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No Deliverables Yet
-              </h3>
-              <p className="text-gray-600 mb-6">
-                No deliverables found for {selectedContact.firstName} {selectedContact.lastName}. Start building work artifacts above.
-              </p>
-            </div>
-          ) : (
             <div className="space-y-4">
               {deliverables.map((deliverable) => (
-                <div
+                <button
                   key={deliverable.id}
-                  className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+                  type="button"
+                  onClick={() => router.push(`/client-operations/deliverables/${deliverable.id}`)}
+                  className="w-full rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-red-300 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -244,16 +264,16 @@ export default function DeliverablesPage() {
                         <span className="rounded-full px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-700">
                           {deliverable.status}
                         </span>
+                        {deliverable.type && (
+                          <span className="rounded-full px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700">
+                            {deliverable.type}
+                          </span>
+                        )}
                       </div>
                       {deliverable.description && (
                         <p className="text-gray-600 mb-2">{deliverable.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-sm text-gray-500">
-                        {deliverable.contact && (
-                          <span>
-                            Contact: {deliverable.contact.firstName} {deliverable.contact.lastName}
-                          </span>
-                        )}
                         {deliverable.proposal && (
                           <span>
                             Proposal: {deliverable.proposal.clientName}
@@ -266,12 +286,48 @@ export default function DeliverablesPage() {
                         )}
                       </div>
                     </div>
+                    <div className="ml-4 text-gray-400">
+                      →
+                    </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Empty State - No Contact Selected */}
+        {!selectedContact && (
+          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-12 text-center">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Select a Contact
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Select a contact above to create or view their work package.
+            </p>
+          </div>
+        )}
+
+        {/* Empty State - No Deliverables (but contact selected) */}
+        {selectedContact && viewMode === 'work-package' && deliverables.length === 0 && (
+          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-12 text-center">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No Deliverables Yet
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Create a work page first to set up deliverables for {selectedContact.firstName} {selectedContact.lastName}.
+            </p>
+            <button
+              type="button"
+              onClick={() => setViewMode('fork')}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+            >
+              ← Back to Create Work Page
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
