@@ -83,6 +83,7 @@ model CompanyHQ {
   assessments      Assessment[]
   memberships      CompanyMembership[] // Junction table for multi-HQ access
   domainRegistry   DomainRegistry? // Domain registry entry (one-to-one)
+  deliverables     ConsultantDeliverable[] // Client delivery deliverables
 
   @@map("company_hqs")
 }
@@ -295,11 +296,15 @@ model ConsultantDeliverable {
   title       String
   description String?
   category    String? // "foundation", "integration", "enrichment", etc.
+  type        String? // "persona", "blog", "upload", etc. - deliverable type
+  
+  // Work content (stored as JSON for flexibility)
+  workContent Json? // Actual work artifact (persona data, blog content, etc.)
   
   // Status tracking
   status      String   @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
   
-  // Link to proposal/milestone
+  // Link to proposal/milestone (optional - can start fresh)
   proposalId  String?
   proposal    Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
   milestoneId String? // Reference to milestone in Proposal.milestones JSON (e.g., "milestone-1", "week-4")
@@ -309,12 +314,18 @@ model ConsultantDeliverable {
   completedAt DateTime?
   notes       String?
   
+  // Tenant scoping (for client delivery architecture)
+  companyHQId     String   // Always linked to owner's company (tenant boundary)
+  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contactCompanyId String? // Link to contact's company (can derive from contact.contactCompanyId)
+  
   // Metadata
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   @@index([contactId])
   @@index([proposalId])
+  @@index([companyHQId])
   @@map("consultant_deliverables")
 }
 
