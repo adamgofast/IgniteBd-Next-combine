@@ -72,9 +72,9 @@ export async function POST(request) {
     const body = await request.json();
     const {
       id = null,
-      name,
-      role = null,
-      title = null,
+      personName,
+      name, // Backward compatibility - map to personName
+      title,
       headline = null,
       seniority = null,
       industry = null,
@@ -84,16 +84,11 @@ export async function POST(request) {
       annualRevenue = null,
       location = null,
       description = null,
-      whatTheyWant = null, // New field (replaces goals)
-      goals = null, // Deprecated - map to whatTheyWant if provided
-      painPoints = null, // Can be string (old) or JSON array (new)
+      whatTheyWant = null,
+      painPoints = null,
       risks = null,
       decisionDrivers = null,
-      workflows = null,
-      desiredOutcome = null, // Deprecated
-      valuePropToPersona = null, // Deprecated
-      productId = null,
-      alignmentScore: alignmentScoreInput,
+      buyerTriggers = null,
       companyHQId,
     } = body ?? {};
 
@@ -106,47 +101,54 @@ export async function POST(request) {
       );
     }
 
-    if (!name) {
+    const finalPersonName = personName || name;
+    if (!finalPersonName) {
       return NextResponse.json(
-        { error: 'name is required' },
+        { error: 'personName is required' },
         { status: 400 },
       );
     }
 
-    // Normalize painPoints - convert string to array if needed
-    let normalizedPainPoints = painPoints;
-    if (painPoints && typeof painPoints === 'string') {
-      // Try to parse as JSON, otherwise wrap in array
-      try {
-        normalizedPainPoints = JSON.parse(painPoints);
-      } catch {
-        // If it's a plain string, convert to array
-        normalizedPainPoints = [painPoints];
-      }
+    if (!title) {
+      return NextResponse.json(
+        { error: 'title is required' },
+        { status: 400 },
+      );
     }
 
-    // Map deprecated fields to new fields
-    const finalWhatTheyWant = whatTheyWant || goals || null;
+    // Normalize array fields - convert string/JSON to array if needed
+    const normalizeArray = (value) => {
+      if (!value) return [];
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [value];
+        } catch {
+          return [value];
+        }
+      }
+      return [];
+    };
     
     const personaData = {
       companyHQId: tenantId,
-      name,
-      role,
+      personName: finalPersonName,
       title,
       headline,
       seniority,
       industry,
-      subIndustries: subIndustries ? (typeof subIndustries === 'string' ? JSON.parse(subIndustries) : subIndustries) : null,
+      subIndustries: normalizeArray(subIndustries),
       company,
       companySize,
       annualRevenue,
       location,
       description,
-      whatTheyWant: finalWhatTheyWant,
-      painPoints: normalizedPainPoints,
-      risks: risks ? (typeof risks === 'string' ? JSON.parse(risks) : risks) : null,
-      decisionDrivers: decisionDrivers ? (typeof decisionDrivers === 'string' ? JSON.parse(decisionDrivers) : decisionDrivers) : null,
-      workflows: workflows ? (typeof workflows === 'string' ? JSON.parse(workflows) : workflows) : null,
+      whatTheyWant,
+      painPoints: normalizeArray(painPoints),
+      risks: normalizeArray(risks),
+      decisionDrivers: normalizeArray(decisionDrivers),
+      buyerTriggers: normalizeArray(buyerTriggers),
     };
 
     let persona;

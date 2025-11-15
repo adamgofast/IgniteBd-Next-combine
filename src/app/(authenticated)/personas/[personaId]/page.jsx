@@ -41,7 +41,7 @@ export default function PersonaDetailPage({ params }) {
 
   const displayName = useMemo(() => {
     if (!persona) return 'Persona';
-    return persona.name || persona.role || 'Persona';
+    return persona.personName || persona.name || persona.title || 'Persona';
   }, [persona]);
 
   if (loading) {
@@ -83,7 +83,7 @@ export default function PersonaDetailPage({ params }) {
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title={displayName}
-          subtitle={persona.role || 'Buyer persona overview'}
+          subtitle={persona.title || 'Buyer persona overview'}
           backTo="/personas"
           backLabel="Back to Personas"
           actions={
@@ -105,8 +105,8 @@ export default function PersonaDetailPage({ params }) {
             </h3>
             <dl className="space-y-3 text-sm text-gray-600">
               <div>
-                <dt className="font-semibold text-gray-700">Role</dt>
-                <dd>{persona.role || persona.title || 'Not captured yet'}</dd>
+                <dt className="font-semibold text-gray-700">Title</dt>
+                <dd>{persona.title || 'Not captured yet'}</dd>
               </div>
               {persona.headline && (
                 <div>
@@ -190,6 +190,18 @@ export default function PersonaDetailPage({ params }) {
                         <p className="mt-1">{persona.productFit.alignmentReasoning}</p>
                       </>
                     )}
+                  </div>
+                </div>
+              )}
+              {persona.buyerTriggers && persona.buyerTriggers.length > 0 && (
+                <div>
+                  <p className="font-semibold text-gray-800">Buyer Triggers</p>
+                  <div className="mt-1 text-sm text-gray-600">
+                    <ul className="list-disc list-inside space-y-1">
+                      {persona.buyerTriggers.map((trigger, idx) => (
+                        <li key={idx}>{trigger}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               )}

@@ -362,23 +362,22 @@ model ProposalDeliverable {
 model Persona {
   id              String      @id @default(cuid())
   companyHQId     String
-  name            String
-  role            String?
-  title           String?
-  headline        String? // LinkedIn headline (self-identifier)
+  personName      String
+  title           String
+  headline        String?
   seniority       String?
   industry        String?
-  subIndustries   Json? // Array of sub-industries
-  company         String? // Company name
+  subIndustries   String[]
+  company         String?
   companySize     String?
   annualRevenue   String?
   location        String?
-  description     String? // Persona description
-  whatTheyWant    String? // Single distillation of intent (replaces goals)
-  painPoints      Json? // Array of pain points
-  risks           Json? // Array of risks
-  decisionDrivers Json? // Array of decision drivers
-  workflows       Json? // Array of workflows
+  description     String?
+  whatTheyWant    String?
+  painPoints      String[]
+  risks           String[]
+  decisionDrivers String[]
+  buyerTriggers   String[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   companyHQ       CompanyHQ   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)

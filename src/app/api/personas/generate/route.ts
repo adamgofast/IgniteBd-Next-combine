@@ -80,17 +80,18 @@ export async function POST(request: Request) {
     
     // Build OpenAI prompt
     const systemPrompt = `You are an expert in executive psychology and business persona modeling. 
-Given the enriched Apollo contact JSON, generate a precise, non-generic persona for this specific human.
+Given enriched Apollo or LinkedIn contact JSON, generate a precise, non-generic persona for this specific human.
 
-Focus on:
-- Their role responsibilities
-- Their seniority
-- Their industry + company size
-- Their LinkedIn headline (self-identifier)
-- Their economic environment (annual revenue, market)
-- Their lived problems, aspirations, and identity
+Infer from:
+- their role and seniority
+- their industry and company size
+- their headline / bio
+- their responsibilities and pressures
+- what they optimize for
+- what risks they manage
+- how they decide
 
-Return JSON ONLY in this format:
+Return JSON ONLY in this exact structure:
 {
   "personName": "",
   "title": "",
@@ -107,7 +108,7 @@ Return JSON ONLY in this format:
   "painPoints": [],
   "risks": [],
   "decisionDrivers": [],
-  "workflows": []
+  "buyerTriggers": []
 }`;
 
     const userPrompt = `Generate a persona from this Apollo enrichment data:
@@ -152,7 +153,14 @@ ${JSON.stringify(rawApolloResponse, null, 2)}`;
     // Validate required fields
     if (!personaData.personName) {
       return NextResponse.json(
-        { success: false, error: 'Persona name is required' },
+        { success: false, error: 'personName is required' },
+        { status: 400 },
+      );
+    }
+
+    if (!personaData.title) {
+      return NextResponse.json(
+        { success: false, error: 'title is required' },
         { status: 400 },
       );
     }
@@ -161,22 +169,22 @@ ${JSON.stringify(rawApolloResponse, null, 2)}`;
     const persona = await prisma.persona.create({
       data: {
         companyHQId,
-        name: personaData.personName,
-        title: personaData.title || null,
+        personName: personaData.personName,
+        title: personaData.title,
         headline: personaData.headline || null,
         seniority: personaData.seniority || null,
         industry: personaData.industry || null,
-        subIndustries: personaData.subIndustries || null,
+        subIndustries: personaData.subIndustries || [],
         company: personaData.company || null,
         companySize: personaData.companySize || null,
         annualRevenue: personaData.annualRevenue || null,
         location: personaData.location || null,
         description: personaData.description || null,
         whatTheyWant: personaData.whatTheyWant || null,
-        painPoints: personaData.painPoints || null,
-        risks: personaData.risks || null,
-        decisionDrivers: personaData.decisionDrivers || null,
-        workflows: personaData.workflows || null,
+        painPoints: personaData.painPoints || [],
+        risks: personaData.risks || [],
+        decisionDrivers: personaData.decisionDrivers || [],
+        buyerTriggers: personaData.buyerTriggers || [],
       },
     });
 

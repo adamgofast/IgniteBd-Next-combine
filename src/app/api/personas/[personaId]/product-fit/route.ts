@@ -110,7 +110,7 @@ Return JSON ONLY:
 
     const userPrompt = `Persona:
 ${JSON.stringify({
-  name: persona.name,
+  personName: persona.personName,
   title: persona.title,
   headline: persona.headline,
   seniority: persona.seniority,
@@ -125,7 +125,7 @@ ${JSON.stringify({
   painPoints: persona.painPoints,
   risks: persona.risks,
   decisionDrivers: persona.decisionDrivers,
-  workflows: persona.workflows,
+  buyerTriggers: persona.buyerTriggers,
 }, null, 2)}
 
 Available Products:
