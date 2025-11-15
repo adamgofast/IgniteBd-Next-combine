@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Search, User, Mail, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 
@@ -19,7 +19,7 @@ export default function NewWorkPackagePage() {
   const [contactId, setContactId] = useState('');
   const [companyHQId, setCompanyHQId] = useState('');
   const [contacts, setContacts] = useState([]);
-  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,6 +36,19 @@ export default function NewWorkPackagePage() {
       const storedContactId = window.localStorage.getItem('contactId') || '';
       if (storedContactId) {
         setContactId(storedContactId);
+        // Set search to show selected contact
+        const cachedContacts = window.localStorage.getItem('contacts');
+        if (cachedContacts) {
+          try {
+            const parsed = JSON.parse(cachedContacts);
+            const found = parsed.find(c => c.id === storedContactId);
+            if (found) {
+              setContactSearch(`${found.firstName || ''} ${found.lastName || ''}`.trim() || found.email || '');
+            }
+          } catch (error) {
+            console.warn('Failed to parse cached contacts', error);
+          }
+        }
       }
 
       // Load contacts from localStorage (dashboard pattern - no API call)
@@ -52,6 +65,20 @@ export default function NewWorkPackagePage() {
       }
     }
   }, []);
+
+  // Filter contacts based on search
+  const availableContacts = useMemo(() => {
+    if (!contactSearch || !contactSearch.trim()) {
+      return contacts.slice(0, 20);
+    }
+    const searchLower = contactSearch.toLowerCase();
+    return contacts.filter(contact => {
+      const name = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
+      const email = (contact.email || '').toLowerCase();
+      const company = (contact.contactCompany?.companyName || '').toLowerCase();
+      return name.includes(searchLower) || email.includes(searchLower) || company.includes(searchLower);
+    }).slice(0, 20);
+  }, [contactSearch, contacts]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -131,35 +158,115 @@ export default function NewWorkPackagePage() {
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Client Contact <span className="text-red-600">*</span>
               </label>
-              {loadingContacts ? (
-                <div className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-gray-50">
-                  <p className="text-sm text-gray-500">Loading contacts...</p>
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder="Search contacts by name, email, or company..."
+                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  />
+                  {contactSearch && (
+                    <button
+                      onClick={() => {
+                        setContactSearch('');
+                        setContactId('');
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <select
-                  value={contactId}
-                  onChange={(e) => {
-                    setContactId(e.target.value);
-                    if (error) setError('');
-                    // Store in localStorage
-                    if (typeof window !== 'undefined') {
-                      window.localStorage.setItem('contactId', e.target.value);
-                    }
-                  }}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                  required
-                >
-                  <option value="">Select a client contact...</option>
-                  {contacts.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.firstName} {contact.lastName} {contact.email ? `(${contact.email})` : ''}
-                    </option>
-                  ))}
-                </select>
+                
+                {contactSearch && availableContacts.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+                    {availableContacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        type="button"
+                        onClick={() => {
+                          setContactId(contact.id);
+                          setContactSearch(`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
+                          if (error) setError('');
+                          // Store in localStorage
+                          if (typeof window !== 'undefined') {
+                            window.localStorage.setItem('contactId', contact.id);
+                          }
+                        }}
+                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                          contactId === contact.id ? 'bg-red-50' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <User className="h-5 w-5 text-red-600" />
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                {contact.firstName} {contact.lastName}
+                              </p>
+                              {contact.email && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Mail className="h-4 w-4 text-gray-400" />
+                                  <p className="text-sm text-gray-600">{contact.email}</p>
+                                </div>
+                              )}
+                              {contact.contactCompany?.companyName && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {contact.contactCompany.companyName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {contactId === contact.id && (
+                            <CheckCircle className="h-5 w-5 text-red-600" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {contactId && (
+                <div className="mt-3 rounded-lg border-2 border-red-200 bg-red-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                        <User className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {contacts.find(c => c.id === contactId)?.firstName} {contacts.find(c => c.id === contactId)?.lastName}
+                        </p>
+                        {contacts.find(c => c.id === contactId)?.email && (
+                          <p className="text-sm text-gray-600">{contacts.find(c => c.id === contactId)?.email}</p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContactId('');
+                        setContactSearch('');
+                      }}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
               )}
-              {contacts.length === 0 && !loadingContacts && (
-                <p className="mt-1 text-xs text-gray-500">
-                  No contacts found. Create a contact first.
+              
+              {contacts.length === 0 && (
+                <p className="mt-2 text-xs text-gray-500">
+                  No contacts found in cache. Create a contact first or refresh from dashboard.
                 </p>
               )}
             </div>
