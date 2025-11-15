@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { prisma } from '@/lib/prisma';
 import { OpenAI } from 'openai';
@@ -30,7 +30,7 @@ function getOpenAIClient(): OpenAI {
  * Returns: Created BdIntel
  */
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ personaId: string }> }
 ) {
   try {
