@@ -1,140 +1,168 @@
-# Client Operations Architecture
+# Client Operations & Portal Architecture
 
-## Premise
+## Overview
 
-**Client Operations** is about **delivering value** to clients once they enter our architecture. Pipeline stages are just **configuration** - what matters is:
-
-1. **What we're providing** - Consultant deliverables linked to the client
-2. **Status** - Real-time visibility into work progress
-3. **Payments** - Clear billing and payment tracking
-4. **Contracts** - Formal agreements that drive the engagement
+**Client Operations** is about **delivering value** to clients once they enter our architecture. This document covers both the **owner-side operations** (creating deliverables, managing work) and the **client-side portal** (where clients view their engagement).
 
 **The Core Reality:**
 ```
 Contact → Contract → Deliverables → Client Portal → Pay Bills
 ```
 
-Pipeline stages (`prospect/lead`, `prospect/qualified`, `client/kickoff`) are just **operational configuration** - they help organize work but don't define value. What defines value is:
-
-- **ConsultantDeliverable** - What we're actually delivering (linked to `contactId`)
-- **ContractId** - The formal agreement (`Company.contractId`)
-- **Proposal** - The engagement plan with phases, milestones, payments
-- **Status** - Where things stand right now
+**Key Principle:** Contact-First (Universal Personhood)
+- Contact exists in IgniteBD (funnel, outreach, etc.)
+- Same Contact can access Client Portal
+- **No new user record needed** - Contact IS the user
+- Contact's email = Firebase login username
+- Contact's `firebaseUid` = Portal identity
 
 ---
 
-## Architecture Overview
+## Owner-Side Operations
 
-### Contact-First Operations
+### The Owner Flow
 
-**Core Principle:** All operations start with the **Contact** and use `contactCompanyId` associations.
+**1. Create Proposal**
+```
+Owner → Select Contact
+  → Create/upsert Company (via contactCompanyId)
+  → Create Proposal (linked to companyHQId, companyId)
+  → Proposal status: "draft" → "active" → "approved"
+```
 
-**The Pattern:**
-1. **Link to Tenant** - Everything is scoped to `companyHQId` (tenant boundary)
-2. **Contact-First** - Start with the Contact (the person)
+**2. Convert Proposal to Deliverables**
+```
+When Proposal status = "approved":
+  → ProposalToDeliverablesService.convertProposalToDeliverables()
+  → Extracts deliverables from Proposal.phases/milestones
+  → Creates ConsultantDeliverable records
+  → Links to contactId, proposalId, companyHQId, contactCompanyId
+  → Status starts as "pending"
+```
+
+**3. Start Work**
+```
+Owner → Select Contact
+  → Navigate to deliverable build page (?contactId=xyz)
+  → Build work artifact (persona, blog, upload, etc.)
+  → Save to ConsultantDeliverable.workContent (JSON)
+  → Update status: "pending" → "in-progress"
+```
+
+**4. Generate Portal Access**
+```
+Owner → Contact Detail Page
+  → Click "Generate Portal Access"
+  → POST /api/contacts/:contactId/generate-portal-access
+  → Creates Firebase account (passwordless)
+  → Generates InviteToken (24h expiration)
+  → Returns activation link
+  → Owner sends link to Contact
+```
+
+### Owner-Side Hydration/Upsert Pattern
+
+**All upserts follow this pattern:**
+1. **Link to Tenant** - Everything scoped to `companyHQId` (tenant boundary)
+2. **Contact-First** - Start with Contact (the person)
 3. **Company Association** - Use `contactCompanyId` to link Contact → Company
-4. **Upsert Pattern** - All upserts follow: link to tenant, then create based on contact/companyId associations
+4. **Create/Update** - Based on contact/companyId associations
 
-**Example Flow:**
-```
-1. Select Contact (from contacts list, hydrated from companyHQId)
-2. Confirm Business (Company) - upsert Company based on contactCompanyId
-3. Create Proposal - link to companyHQId and companyId
-4. Create Deliverables - link to contactId and proposalId
-```
-
-**Upsert Pattern:**
+**Example: Creating Deliverable**
 ```javascript
-// All upserts follow this pattern:
-// 1. Link to tenant (companyHQId)
-// 2. Create/update based on contact/companyId associations
-
-// Example: Company upsert
-const company = await upsertCompany({
-  companyHQId,        // Tenant boundary
-  companyName,         // Company name
-  contactCompanyId,   // Link via contact association
+// 1. Get contact (already has companyHQId via crmId)
+const contact = await prisma.contact.findUnique({
+  where: { id: contactId },
+  include: { contactCompany: true }
 });
 
-// Example: Proposal creation
-const proposal = await createProposal({
-  companyHQId,        // Tenant boundary
-  companyId,          // Link to Company (from contactCompanyId)
-  contactId,          // Link to Contact
-  // ... proposal data
+// 2. Extract tenant and company info
+const companyHQId = contact.crmId; // Tenant boundary
+const contactCompanyId = contact.contactCompanyId; // Contact's company
+
+// 3. Create deliverable (linked to tenant, contact, company)
+const deliverable = await prisma.consultantDeliverable.create({
+  data: {
+    contactId,              // Link to Contact
+    companyHQId,            // Tenant boundary
+    contactCompanyId,       // Contact's company
+    proposalId,             // Optional: link to Proposal
+    title: "...",
+    status: "pending",
+    // ... other fields
+  }
 });
 ```
 
-### The Client Operations Model
+**Example: Converting Proposal to Deliverables**
+```javascript
+// When proposal is approved:
+// ProposalToDeliverablesService.convertProposalToDeliverables(proposalId)
 
-**What Actually Matters:**
+// 1. Get proposal with company/contact
+const proposal = await prisma.proposal.findUnique({
+  where: { id: proposalId },
+  include: {
+    company: {
+      include: { contacts: { take: 1 } }
+    }
+  }
+});
 
-1. **Contact** - The person (universal personhood) - **START HERE**
-2. **Company** - The client company (`Company.contractId` links to contract) - **LINKED VIA contactCompanyId**
-3. **Contract** - Formal agreement (stored via `contractId`)
-4. **ConsultantDeliverable** - What we're delivering (linked to `contactId`)
-5. **Proposal** - Engagement plan (phases, milestones, payments) - **LINKED TO companyId**
-6. **Client Portal** - Client-facing view that hydrates on load
+// 2. Extract deliverables from proposal structure
+const deliverables = extractDeliverablesFromProposal(proposal);
 
-**Pipeline Stages = Just Config**
-- Stages are organizational tools
-- They don't create value
-- Focus on deliverables, contracts, and payments
-
-### Data Relationships
-
-**Contact-First Hierarchy:**
+// 3. Create ConsultantDeliverable for each
+const created = await Promise.all(
+  deliverables.map(d => prisma.consultantDeliverable.create({
+    data: {
+      contactId: proposal.company.contacts[0].id,
+      companyHQId: proposal.companyHQId,
+      contactCompanyId: proposal.companyId,
+      proposalId: proposal.id,
+      title: d.title,
+      status: 'pending',
+      // ... other fields
+    }
+  }))
+);
 ```
-CompanyHQ (Tenant)
-  └── Contact (Person)
-        └── contactCompanyId → Company (Client Business)
-              └── Proposal (Engagement)
-                    └── ConsultantDeliverable (What we're providing)
-```
 
-**Key Associations:**
-- `Contact.contactCompanyId` → `Company.id` (Contact works for Company)
-- `Proposal.companyId` → `Company.id` (Proposal is for Company)
-- `ConsultantDeliverable.contactId` → `Contact.id` (Deliverable is for Contact)
-- `ConsultantDeliverable.proposalId` → `Proposal.id` (Deliverable from Proposal)
+### ConsultantDeliverable Model
 
----
-
-## Consultant Deliverables
-
-### The Deliverable Model
-
-**What We Need:**
-- Deliverables linked to `contactId` (the client contact)
-- Track what we're providing
-- Show status (pending, in-progress, completed)
-- Link to phases/milestones from Proposal
-
-### Proposed Schema Addition
-
+**Schema:**
 ```prisma
 model ConsultantDeliverable {
   id          String   @id @default(cuid())
   contactId   String   // Link to Contact (the client)
-  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   
   // What we're delivering
   title       String
   description String?
-  category    String? // "foundation", "integration", "enrichment", etc.
+  category    String?  // "foundation", "integration", "enrichment", etc.
+  type        String?  // "persona", "blog", "upload", etc.
+  
+  // Work content (stored as JSON for flexibility)
+  workContent Json?    // Actual work artifact (persona data, blog content, etc.)
   
   // Status tracking
   status      String   @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
   
-  // Link to proposal/milestone
+  // Link to proposal/milestone (optional)
   proposalId  String?
   proposal    Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
-  milestoneId String? // Reference to milestone in Proposal.milestones JSON
+  milestoneId String?  // Reference to milestone in Proposal.milestones JSON
   
   // Delivery tracking
   dueDate     DateTime?
   completedAt DateTime?
   notes       String?
+  
+  // Tenant scoping
+  companyHQId     String   // Always linked to owner's company
+  companyHQ       CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contactCompanyId String? // Link to contact's company
   
   // Metadata
   createdAt   DateTime @default(now())
@@ -142,134 +170,105 @@ model ConsultantDeliverable {
   
   @@index([contactId])
   @@index([proposalId])
+  @@index([companyHQId])
   @@map("consultant_deliverables")
 }
 ```
 
-### Deliverable Operations
-
-**Create Deliverable:**
-```javascript
-// POST /api/deliverables
-{
-  contactId: 'xxx',
-  title: '3 Target Personas',
-  description: 'Define and document 3 target personas for outreach',
-  category: 'foundation',
-  proposalId: 'yyy',
-  milestoneId: 'milestone-1',
-  dueDate: '2025-11-15',
-  status: 'in-progress'
-}
-```
-
-**Update Status:**
-```javascript
-// PUT /api/deliverables/:deliverableId
-{
-  status: 'completed',
-  completedAt: '2025-11-14',
-  notes: 'Delivered personas document via email'
-}
-```
-
-**Get Deliverables for Client:**
-```javascript
-// GET /api/deliverables?contactId=xxx
-// Returns all deliverables for this client contact
-```
+**Key Fields:**
+- `workContent` (JSON) - Actual work artifact (persona, blog, etc.) - **This indicates work has started**
+- `status` - Tracks progress: pending → in-progress → completed
+- `companyHQId` - Tenant boundary (owner's company)
+- `contactCompanyId` - Contact's company (for scoping)
 
 ---
 
-## Contract Management
+## Client Portal Architecture
 
-### Contract Model
+### Separate App, Shared Database
 
-**Current State:**
-- `Company.contractId` - String field that can link to contract
-- Contract details likely stored externally or in Proposal
+- **Standalone Product**: Separate Next.js app (`ignitebd-clientportal`)
+- **Shared Database**: Uses same Prisma schema and PostgreSQL database as IgniteBD
+- **Direct DB Access**: Reads/writes directly via Prisma (no dependency on IgniteBD API)
+- **Independent Deployment**: Own domain (`clientportal.ignitegrowth.biz`)
 
-**Contract Operations:**
+### Strategic Routing (Welcome Page)
 
-**Link Contract to Company:**
+**Owners send contacts to portal in two scenarios:**
+
+1. **First Visit: Proposal Ready**
+   - Proposal exists (draft/active/approved)
+   - No deliverables OR deliverables exist but no workContent
+   - **Route:** `/proposals/[proposalId]` (proposal view)
+
+2. **Second Visit: Work Started**
+   - Deliverables exist with `workContent` (actual work artifacts)
+   - OR deliverables have status "in-progress" or "completed"
+   - **Route:** `/dashboard` (work view with deliverables)
+
+**Welcome Router Logic:**
 ```javascript
-// PUT /api/companies/:companyId
-{
-  contractId: 'contract-xxx',
-  // Contract details might be in separate system
-  // Or stored in Proposal.compensation
+// GET /api/client/state
+// Checks:
+// 1. Does contact have deliverables with workContent?
+// 2. Do deliverables have active status (in-progress/completed)?
+// 3. Does contact have proposals?
+
+if (workHasStarted) {
+  route = '/dashboard';  // Scenario 2: Work has started
+} else if (primaryProposal) {
+  route = `/proposals/${primaryProposal.id}`;  // Scenario 1: Proposal ready
+} else {
+  route = '/dashboard';  // Fallback: Empty state
 }
 ```
 
-**Get Contract Info:**
-```javascript
-// GET /api/companies/:companyId
-// Returns Company with contractId
-// Contract details come from Proposal or external system
-```
+### Portal Routes
 
-**Key Point:** Contract is the **formal agreement**. It drives:
-- What we're delivering (ConsultantDeliverable)
-- Payment schedule (Proposal.compensation)
-- Timeline (Proposal.milestones)
+**Core Routes:**
+- `/splash` - Auth check (redirects to welcome/login)
+- `/login` - Contact login (email + password via Firebase)
+- `/welcome` - **Strategic router** (routes to proposal view or dashboard)
+- `/dashboard` - Main dashboard (deliverables, stats, invoices)
+- `/proposals/[proposalId]` - Proposal detail view (when proposal ready)
+- `/settings` - Settings (password change, billing)
 
----
+**Missing Routes (Nav buttons exist but not implemented):**
+- `/foundational-work` - Detailed deliverables view
+- `/proposals` - Proposal list page
+- `/timeline` - Timeline visualization
 
-## Client Portal Hydration
+### Portal Hydration
 
-### Portal Purpose
+**Hydration Endpoint:** `GET /api/proposals/:proposalId/portal`
 
-**The Client Portal hydrates on load and shows:**
-
-1. **What We're Providing** - List of ConsultantDeliverables with status
-2. **Status** - Current state of all deliverables and milestones
-3. **Pay Your Bills** - Payment schedule, invoices, payment status
-
-### Hydration Endpoint
-
-**Route:** `GET /api/proposals/:proposalId/portal`
-
-**What Gets Hydrated:**
-
+**Returns:**
 ```javascript
 {
   success: true,
   portalData: {
-    // Client info
     client: {
       name: "Joel Gulick",
       company: "BusinessPoint Law",
       contactEmail: "joel@businesspointlaw.com",
       contactId: "xxx"
     },
-    
-    // Contract info
     contract: {
       contractId: "contract-xxx",
-      status: "active",
-      signedDate: "2025-11-03"
+      status: "active"
     },
-    
-    // What we're providing (deliverables)
     deliverables: [
       {
         id: "del-1",
         title: "3 Target Personas",
         status: "completed",
+        category: "foundation",
+        dueDate: "2025-11-15",
         completedAt: "2025-11-10",
-        category: "foundation"
-      },
-      {
-        id: "del-2",
-        title: "Microsoft Graph OAuth Setup",
-        status: "in-progress",
-        dueDate: "2025-11-20",
-        category: "integration"
+        hasWorkContent: true  // Indicates work has started
       },
       // ... more deliverables
     ],
-    
-    // Proposal structure
     proposal: {
       id: "proposal-xxx",
       purpose: "...",
@@ -277,8 +276,6 @@ model ConsultantDeliverable {
       milestones: [/* milestone data */],
       status: "active"
     },
-    
-    // Payment info
     payments: [
       {
         id: "payment-1",
@@ -289,501 +286,188 @@ model ConsultantDeliverable {
       },
       // ... more payments
     ],
-    
-    // Overall status
     status: {
       overall: "in-progress",
       completedDeliverables: 3,
-      totalDeliverables: 8,
-      nextMilestone: "Week 4: Midpoint",
-      nextPayment: {
-        amount: 500,
-        dueDate: "2025-11-15"
-      }
+      totalDeliverables: 8
     }
   }
 }
 ```
 
-### Portal Load Flow
+### Authentication Flow
 
-**On Portal Load:**
-```javascript
-// Client Portal loads with engagementId (proposalId)
-useEffect(() => {
-  const engagementId = params.engagementId;
-  
-  // Hydrate everything on load
-  fetch(`/api/proposals/${engagementId}/portal`)
-    .then(res => res.json())
-    .then(data => {
-      setPortalData(data.portalData);
-      // Portal now shows:
-      // - What we're providing (deliverables)
-      // - Status of everything
-      // - Payment schedule
-    });
-}, [params.engagementId]);
+**1. Generate Portal Access (Owner Side)**
+```
+Owner → POST /api/contacts/:contactId/generate-portal-access
+  → Creates Firebase account (passwordless)
+  → Stores firebaseUid in Contact.firebaseUid
+  → Generates InviteToken (24h expiration)
+  → Returns activation link: /activate?token=<token>
 ```
 
-**What Client Sees:**
-1. **Landing Page** - Welcome, overview, navigation
-2. **Deliverables View** - List of what we're providing with status
-3. **Timeline** - Milestones and progress
-4. **Payments** - Payment schedule, invoices, pay bills
-
----
-
-## Operations-Focused Workflow
-
-### The Real Flow (Not Pipeline Stages)
-
-**1. Contact + Contract**
+**2. Contact Activation**
 ```
-Contact exists (from outreach, upload, etc.)
-Contract signed → Company.contractId set
-Proposal created → Linked to Company
+Contact clicks activation link
+  → GET /activate?token=<token>
+  → POST /api/activate (verifies token)
+  → Redirects to /set-password?uid=<firebaseUid>&email=<email>&contactId=<contactId>
+  → Contact sets password
+  → POST /api/set-password (sets Firebase password)
+  → Marks Contact.isActivated = true
+  → Redirects to /login?activated=true
 ```
 
-**2. Deliverables Created**
+**3. Contact Login**
 ```
-For each phase/milestone in Proposal:
-  - Create ConsultantDeliverable
-  - Link to contactId
-  - Link to proposalId/milestoneId
-  - Set dueDate from milestone
-```
-
-**3. Work Begins**
-```
-Deliverables status: pending → in-progress
-Update as work progresses
-Mark completed when done
+Contact → /login
+  → Enters email + password
+  → Firebase authenticates
+  → GET /api/contacts/by-email?email=<email>
+  → Stores in localStorage:
+     - clientPortalContactId
+     - clientPortalContactEmail
+     - firebaseToken
+     - firebaseId
+  → Redirects to /welcome
 ```
 
-**4. Client Portal Active**
+**4. Welcome Router**
 ```
-Client accesses portal
-Portal hydrates on load:
-  - Shows all deliverables (what we're providing)
-  - Shows status of each
-  - Shows payment schedule
-  - Client can pay bills
-```
-
-**5. Payments Processed**
-```
-Payment due → Invoice sent
-Client pays via portal
-Payment status updated
-Next payment scheduled
+/welcome loads
+  → GET /api/client/state
+  → Checks:
+     - Deliverables with workContent? → /dashboard
+     - Proposals exist? → /proposals/[proposalId]
+     - Otherwise → /dashboard (empty state)
+  → Routes accordingly
 ```
 
-**6. Engagement Complete**
+**5. Dashboard Hydration**
 ```
-All deliverables completed
-Final payment processed
-Portal shows completion status
-Relationship continues for future work
+/dashboard loads
+  → Gets contactId from localStorage
+  → Gets proposalId from localStorage or finds via API
+  → GET /api/proposals/:proposalId/portal
+  → Displays engagement data
 ```
 
 ---
 
-## Data Model Relationships
+## Data Relationships
 
-### Core Relationships
-
+**Contact-First Hierarchy:**
 ```
-Contact (Client)
-  ├── ConsultantDeliverable[] (what we're providing)
-  │     └── ConsultantDeliverable → Proposal (engagement plan)
-  │
-  └── Contact → Company (client company)
-        └── Company.contractId (formal agreement)
-        └── Company → Proposal[] (engagements)
-              └── Proposal.compensation (payment schedule)
-              └── Proposal.milestones (timeline)
-```
-
-### Key Links
-
-**Contact → Deliverables:**
-- `ConsultantDeliverable.contactId` → `Contact.id`
-- One Contact can have many Deliverables
-- Deliverables show "what we're providing" to this client
-
-**Company → Contract:**
-- `Company.contractId` → Contract (external or in Proposal)
-- Contract defines the engagement
-
-**Proposal → Everything:**
-- `ConsultantDeliverable.proposalId` → `Proposal.id`
-- `Proposal.compensation` → Payment schedule
-- `Proposal.milestones` → Timeline
-- `Proposal.phases` → Work structure
-
----
-
-## Client Portal Implementation
-
-### Portal Structure
-
-**Pages:**
-- `/` - Landing (overview, what we're providing, status summary)
-- `/deliverables` - List of all deliverables with status
-- `/timeline` - Milestones and progress
-- `/payments` - Payment schedule, invoices, pay bills
-- `/proposal` - Full proposal view (optional)
-
-### Portal Components
-
-**DeliverablesList:**
-```javascript
-// Shows what we're providing
-{deliverables.map(deliverable => (
-  <DeliverableCard
-    title={deliverable.title}
-    status={deliverable.status}
-    dueDate={deliverable.dueDate}
-    completedAt={deliverable.completedAt}
-  />
-))}
+CompanyHQ (Tenant/Owner)
+  └── Contact (Person)
+        ├── Firebase Account (email = Contact.email)
+        ├── contactCompanyId → Company (Client Business)
+        │     ├── Proposal[] (Engagements)
+        │     │     └── ConsultantDeliverable[] (Deliverables)
+        │     └── contractId (Formal agreement)
+        └── ConsultantDeliverable[] (What we're providing)
+              └── Linked to Proposal
 ```
 
-**StatusSummary:**
-```javascript
-// Overall status
-<StatusCard
-  completed={status.completedDeliverables}
-  total={status.totalDeliverables}
-  nextMilestone={status.nextMilestone}
-  progress={progressPercentage}
-/>
-```
-
-**PaymentSchedule:**
-```javascript
-// Pay your bills
-{payments.map(payment => (
-  <PaymentCard
-    amount={payment.amount}
-    dueDate={payment.dueDate}
-    status={payment.status}
-    onPay={() => handlePayment(payment.id)}
-  />
-))}
-```
-
-### Portal Hydration API
-
-**Endpoint:** `GET /api/proposals/:proposalId/portal`
-
-**Implementation:**
-```javascript
-// src/app/api/proposals/[proposalId]/portal/route.js
-export async function GET(request, { params }) {
-  const { proposalId } = params;
-  
-  // Get proposal
-  const proposal = await prisma.proposal.findUnique({
-    where: { id: proposalId },
-    include: {
-      company: {
-        include: {
-          contacts: {
-            take: 1 // Primary contact
-          }
-        }
-      }
-    }
-  });
-  
-  // Get deliverables for the contact
-  const contactId = proposal.company.contacts[0]?.id;
-  const deliverables = await prisma.consultantDeliverable.findMany({
-    where: { contactId },
-    orderBy: { dueDate: 'asc' }
-  });
-  
-  // Transform to portal format
-  const portalData = {
-    client: {
-      name: proposal.clientName,
-      company: proposal.clientCompany,
-      contactEmail: proposal.company.contacts[0]?.email,
-      contactId
-    },
-    contract: {
-      contractId: proposal.company.contractId,
-      status: proposal.status === 'approved' ? 'active' : 'pending'
-    },
-    deliverables: deliverables.map(d => ({
-      id: d.id,
-      title: d.title,
-      status: d.status,
-      category: d.category,
-      dueDate: d.dueDate,
-      completedAt: d.completedAt
-    })),
-    proposal: {
-      id: proposal.id,
-      purpose: proposal.purpose,
-      phases: proposal.phases,
-      milestones: proposal.milestones,
-      status: proposal.status
-    },
-    payments: proposal.compensation?.paymentSchedule || [],
-    status: calculateStatus(deliverables, proposal)
-  };
-  
-  return NextResponse.json({ success: true, portalData });
-}
-```
+**Key Associations:**
+- `Contact.email` → Firebase Auth (universal personhood)
+- `Contact.firebaseUid` → Firebase UID (stored in Contact model)
+- `Contact.contactCompanyId` → `Company.id` (Contact works for Company)
+- `Proposal.companyId` → `Company.id` (Proposal is for Company)
+- `ConsultantDeliverable.contactId` → `Contact.id` (Deliverable is for Contact)
+- `ConsultantDeliverable.proposalId` → `Proposal.id` (Deliverable from Proposal)
+- `ConsultantDeliverable.companyHQId` → `CompanyHQ.id` (Tenant boundary)
+- `ConsultantDeliverable.workContent` → JSON (Actual work artifact - indicates work started)
 
 ---
 
 ## API Endpoints
 
-### Deliverables
+### Owner Side (IgniteBD)
 
-**Create Deliverable**
-```
-POST /api/deliverables
-Body: { contactId, title, description, category, proposalId, milestoneId, dueDate }
-Response: { success: true, deliverable: {...} }
-Auth: Required (Firebase token)
-```
+**POST /api/deliverables**
+- Create deliverable
+- Body: `{ contactId, title, description, category, proposalId, milestoneId, dueDate, status, workContent }`
+- Auth: Required (Firebase token)
 
-**Get Deliverables**
-```
-GET /api/deliverables?contactId=xxx
-Response: { success: true, deliverables: [...] }
-Auth: Optional (scoped by contactId)
-```
+**GET /api/deliverables?contactId=xxx**
+- List deliverables for contact
+- Auth: Optional (scoped by contactId)
 
-**Update Deliverable Status**
-```
-PUT /api/deliverables/:deliverableId
-Body: { status, completedAt?, notes? }
-Response: { success: true, deliverable: {...} }
-Auth: Required (Firebase token)
-```
+**PUT /api/deliverables/:deliverableId**
+- Update deliverable status/workContent
+- Body: `{ status, completedAt, notes, workContent }`
+- Auth: Required (Firebase token)
 
-### Portal
+**POST /api/contacts/:contactId/generate-portal-access**
+- Generate portal access for contact
+- Creates Firebase account, generates InviteToken
+- Returns activation link
+- Auth: Required (Firebase token)
 
-**Get Portal Data (Hydration)**
-```
-GET /api/proposals/:proposalId/portal
-Response: { success: true, portalData: {...} }
-Auth: Optional (public with proposalId)
-```
+### Client Portal
 
-**Update Payment Status**
-```
-PUT /api/proposals/:proposalId/payments/:paymentId
-Body: { status: 'paid', paidAt?, transactionId? }
-Response: { success: true, payment: {...} }
-Auth: Optional (can be public for client payment)
-```
+**GET /api/client/state**
+- Get contact state for strategic routing
+- Returns: proposals, deliverables, routing decision
+- Auth: Required (Firebase token)
 
-### Contracts
+**GET /api/proposals/:proposalId/portal**
+- Get portal data for proposal
+- Returns: client info, deliverables, payments, status
+- Auth: Optional (scoped by proposalId)
 
-**Link Contract**
-```
-PUT /api/companies/:companyId
-Body: { contractId }
-Response: { success: true, company: {...} }
-Auth: Required (Firebase token)
-```
+**GET /api/contacts/:contactId/proposals**
+- Get all proposals for contact
+- Auth: Optional (scoped by contactId)
 
----
+**GET /api/contacts/by-email?email=xxx**
+- Find contact by email
+- Used during login
+- Auth: Optional
 
-## Operations Best Practices
-
-### 1. Deliverable Management
-
-**Create Deliverables from Proposal:**
-- When Proposal is approved, create ConsultantDeliverable for each milestone
-- Link to contactId (the client)
-- Set dueDate from milestone timeline
-- Status starts as 'pending'
-
-**Update Status Regularly:**
-- Move to 'in-progress' when work starts
-- Mark 'completed' when delivered
-- Add notes for context
-- Update completedAt timestamp
-
-**Track Blockers:**
-- If deliverable is blocked, set status to 'blocked'
-- Add notes explaining blocker
-- Client sees this in portal
-
-### 2. Client Portal Experience
-
-**On Load:**
-- Hydrate everything immediately
-- Show clear status of all deliverables
-- Display payment schedule prominently
-- Make "Pay Bills" action obvious
-
-**Status Visibility:**
-- Green = Completed
-- Yellow = In Progress
-- Red = Blocked/Overdue
-- Gray = Pending
-
-**Payment Clarity:**
-- Show amount, due date, status
-- Make payment action clear
-- Show payment history
-- Display next payment prominently
-
-### 3. Contract Management
-
-**Link Early:**
-- Set Company.contractId when contract is signed
-- Link Proposal to Company
-- Create deliverables from Proposal
-
-**Track Status:**
-- Contract status drives engagement status
-- Active contract = active engagement
-- Completed contract = engagement complete
-
-### 4. Communication
-
-**Transparency:**
-- Client portal shows everything
-- No surprises
-- Real-time status updates
-- Clear next steps
-
-**Proactive Updates:**
-- Update deliverable status as work progresses
-- Notify client of completions
-- Alert on blockers
-- Remind of upcoming payments
-
----
-
-## Migration Path
-
-### Phase 1: Add Deliverables Model
-
-**Schema Migration:**
-```prisma
-// Add ConsultantDeliverable model
-model ConsultantDeliverable {
-  // ... (see schema above)
-}
-
-// Update Contact model
-model Contact {
-  // ... existing fields
-  deliverables ConsultantDeliverable[]
-}
-```
-
-**API Implementation:**
-- Create `/api/deliverables` endpoints
-- Link to existing Proposal system
-- Create deliverables from Proposal milestones
-
-### Phase 2: Portal Hydration
-
-**Backend:**
-- Create `GET /api/proposals/:proposalId/portal` endpoint
-- Aggregate deliverables, payments, status
-- Transform to portal format
-
-**Frontend:**
-- Update Client Portal to fetch from API
-- Replace mock data with real hydration
-- Show deliverables, status, payments
-
-### Phase 3: Payment Integration
-
-**Payment Processing:**
-- Integrate payment gateway (Stripe, etc.)
-- Handle payment status updates
-- Update Proposal.compensation.paymentSchedule
-
-**Portal:**
-- Add "Pay Now" functionality
-- Show payment history
-- Display receipts
-
-### Phase 4: Real-Time Updates
-
-**WebSocket/SSE:**
-- Real-time deliverable status updates
-- Payment status changes
-- Milestone completions
-
-**Notifications:**
-- Email on deliverable completion
-- Payment reminders
-- Status change alerts
+**GET /api/contacts/by-firebase-uid**
+- Get contact by Firebase UID
+- Returns contact info including role
+- Auth: Required (Firebase token)
 
 ---
 
 ## Key Takeaways
 
-**Pipeline Stages = Just Config**
-- Stages help organize but don't create value
-- Focus on deliverables, contracts, payments
+**Owner-Side:**
+1. **Contact-First** - All operations start with Contact
+2. **Tenant Scoping** - Everything linked to `companyHQId`
+3. **Proposal → Deliverables** - When proposal approved, convert to deliverables
+4. **Work Content** - `workContent` field indicates work has started
+5. **Upsert Pattern** - Link to tenant, then create based on contact/company associations
 
-**What Actually Matters:**
-1. **ConsultantDeliverable** - What we're providing (linked to contactId)
-2. **ContractId** - Formal agreement (Company.contractId)
-3. **Status** - Real-time visibility
-4. **Payments** - Clear billing and payment
+**Client Portal:**
+1. **Strategic Routing** - Routes based on work state (proposal ready vs work started)
+2. **Universal Personhood** - Contact IS the user (no separate user model)
+3. **Shared Database** - Direct Prisma access, no API dependency
+4. **Hydration** - Portal hydrates on load via `/api/proposals/:proposalId/portal`
+5. **Read-Only** - Clients can view but not edit
 
-**Client Portal Hydrates On Load:**
-- Shows what we're providing (deliverables)
-- Shows status of everything
-- Shows payment schedule
-- Client can pay bills
-
-**Operations-Focused:**
-- Less about pipeline stages
-- More about actual work and value
-- Clear deliverables tracking
-- Transparent status and payments
+**Work Has Started Indicator:**
+- Deliverables with `workContent` (JSON field with actual work artifacts)
+- OR deliverables with status "in-progress" or "completed"
+- Used by welcome router to determine routing
 
 ---
 
 ## Related Documentation
 
-- **`ignitebd_stack_nextguide.md`** - Main stack documentation
-- **`HYDRATION_ARCHITECTURE.md`** - Hydration patterns
 - **`ignitebd-clientportal/README.md`** - Client portal setup
 - **`ignitebd-clientportal/docs/PROPOSAL_STRUCTURE.md`** - Proposal data structure
-
----
-
-## Current Status
-
-**✅ Completed:**
-- Proposal model with phases, milestones, payments
-- Client Portal UI/UX
-- Company.contractId field exists
-
-**🚧 In Progress:**
-- ConsultantDeliverable model (needs to be added)
-- Portal hydration endpoint
-- Deliverables API
-
-**📋 Future:**
-- Payment processing integration
-- Real-time status updates
-- Deliverable completion workflows
+- **`HYDRATION_ARCHITECTURE.md`** - Hydration patterns
 
 ---
 
 **Last Updated**: November 2025  
-**Architecture**: Operations-Focused (Deliverables, Contracts, Payments)  
-**Pipeline Stages**: Just Configuration  
-**Client Portal**: Hydrates on Load - Shows What We're Providing, Status, Pay Bills  
-**Multi-Tenancy**: CompanyHQ-scoped
+**Architecture**: Contact-First (Universal Personhood)  
+**Owner Side**: Proposal → Deliverables → Work Content  
+**Client Portal**: Strategic Routing → Proposal View or Dashboard  
+**Work Indicator**: `workContent` field or active status  
+**Authentication**: Contact.email + Firebase  
+**Portal**: Separate Next.js app, shared database

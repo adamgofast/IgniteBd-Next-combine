@@ -190,7 +190,7 @@ export default function CreateProposalPage() {
     setPhases([
       ...phases,
       {
-        id: `phase-${Date.now()}`,
+        phaseId: `phase-${Date.now()}`,
         name: '',
         weeks: '',
         color: phases.length === 0 ? 'red' : phases.length === 1 ? 'yellow' : 'purple',
@@ -203,23 +203,32 @@ export default function CreateProposalPage() {
   };
 
   const handleUpdatePhase = (phaseId, updates) => {
-    setPhases(phases.map(p => p.id === phaseId ? { ...p, ...updates } : p));
+    setPhases(phases.map(p => p.phaseId === phaseId ? { ...p, ...updates } : p));
   };
 
   const handleAddDeliverable = (phaseId) => {
     setPhases(phases.map(p => {
-      if (p.id === phaseId) {
-        return { ...p, deliverables: [...(p.deliverables || []), ''] };
+      if (p.phaseId === phaseId) {
+        const newDeliverable = {
+          deliverableId: `deliverable-${Date.now()}`,
+          title: '',
+          description: '',
+          category: '',
+          type: '',
+          status: 'pending'
+        };
+        return { ...p, deliverables: [...(p.deliverables || []), newDeliverable] };
       }
       return p;
     }));
   };
 
-  const handleUpdateDeliverable = (phaseId, index, value) => {
+  const handleUpdateDeliverable = (phaseId, deliverableId, field, value) => {
     setPhases(phases.map(p => {
-      if (p.id === phaseId) {
-        const deliverables = [...(p.deliverables || [])];
-        deliverables[index] = value;
+      if (p.phaseId === phaseId) {
+        const deliverables = (p.deliverables || []).map(d => 
+          d.deliverableId === deliverableId ? { ...d, [field]: value } : d
+        );
         return { ...p, deliverables };
       }
       return p;
@@ -228,7 +237,7 @@ export default function CreateProposalPage() {
 
   const handleAddCoreWork = (phaseId) => {
     setPhases(phases.map(p => {
-      if (p.id === phaseId) {
+      if (p.phaseId === phaseId) {
         return { ...p, coreWork: [...(p.coreWork || []), ''] };
       }
       return p;
@@ -237,7 +246,7 @@ export default function CreateProposalPage() {
 
   const handleUpdateCoreWork = (phaseId, index, value) => {
     setPhases(phases.map(p => {
-      if (p.id === phaseId) {
+      if (p.phaseId === phaseId) {
         const coreWork = [...(p.coreWork || [])];
         coreWork[index] = value;
         return { ...p, coreWork };
@@ -260,14 +269,7 @@ export default function CreateProposalPage() {
     setError('');
 
     try {
-      const serviceInstances = selectedServices.map(s => ({
-        name: s.name,
-        description: s.description,
-        quantity: s.quantity,
-        unitPrice: s.unitPrice,
-        price: s.price,
-      }));
-
+      // Removed serviceInstances - deliverables are in phases now
       const compensation = {
         total: totalPrice,
         currency: 'USD',
@@ -281,7 +283,6 @@ export default function CreateProposalPage() {
         companyId: selectedCompany.id,
         purpose: purpose || proposalTitle,
         status: 'draft',
-        serviceInstances: serviceInstances.length > 0 ? serviceInstances : null,
         phases: phases.length > 0 ? phases : null,
         milestones: [],
         compensation,
@@ -620,13 +621,13 @@ export default function CreateProposalPage() {
                 };
                 return (
                   <div
-                    key={phase.id}
+                    key={phase.phaseId}
                     className={`rounded-lg border p-6 ${colorClasses[phase.color] || colorClasses.red}`}
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">Phase {index + 1}</h3>
                       <button
-                        onClick={() => setPhases(phases.filter(p => p.id !== phase.id))}
+                        onClick={() => setPhases(phases.filter(p => p.phaseId !== phase.phaseId))}
                         className="text-red-600 hover:text-red-700"
                       >
                         <X className="h-5 w-5" />
@@ -640,7 +641,7 @@ export default function CreateProposalPage() {
                           <input
                             type="text"
                             value={phase.name}
-                            onChange={(e) => handleUpdatePhase(phase.id, { name: e.target.value })}
+                            onChange={(e) => handleUpdatePhase(phase.phaseId, { name: e.target.value })}
                             placeholder="e.g., Foundation"
                             className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                           />
@@ -650,7 +651,7 @@ export default function CreateProposalPage() {
                           <input
                             type="text"
                             value={phase.weeks}
-                            onChange={(e) => handleUpdatePhase(phase.id, { weeks: e.target.value })}
+                            onChange={(e) => handleUpdatePhase(phase.phaseId, { weeks: e.target.value })}
                             placeholder="e.g., 1-3"
                             className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                           />
@@ -661,7 +662,7 @@ export default function CreateProposalPage() {
                         <label className="mb-1 block text-xs font-semibold text-gray-700">Goal</label>
                         <textarea
                           value={phase.goal}
-                          onChange={(e) => handleUpdatePhase(phase.id, { goal: e.target.value })}
+                          onChange={(e) => handleUpdatePhase(phase.phaseId, { goal: e.target.value })}
                           placeholder="Phase goal..."
                           rows={2}
                           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
@@ -672,23 +673,30 @@ export default function CreateProposalPage() {
                         <div className="mb-2 flex items-center justify-between">
                           <label className="block text-xs font-semibold text-gray-700">Deliverables</label>
                           <button
-                            onClick={() => handleAddDeliverable(phase.id)}
+                            onClick={() => handleAddDeliverable(phase.phaseId)}
                             className="text-xs text-red-600 hover:text-red-700"
                           >
                             + Add
                           </button>
                         </div>
                         <div className="space-y-2">
-                          {(phase.deliverables || []).map((deliverable, delIndex) => (
-                            <input
-                              key={delIndex}
-                              type="text"
-                              value={deliverable}
-                              onChange={(e) => handleUpdateDeliverable(phase.id, delIndex, e.target.value)}
-                              placeholder="e.g., 3 Target Personas"
-                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                            />
-                          ))}
+                          {(phase.deliverables || []).map((deliverable) => {
+                            // Handle both old format (string) and new format (object)
+                            const isString = typeof deliverable === 'string';
+                            const deliverableId = isString ? `deliverable-${Date.now()}-${Math.random()}` : deliverable.deliverableId;
+                            const title = isString ? deliverable : (deliverable.title || '');
+                            
+                            return (
+                              <input
+                                key={deliverableId}
+                                type="text"
+                                value={title}
+                                onChange={(e) => handleUpdateDeliverable(phase.phaseId, deliverableId, 'title', e.target.value)}
+                                placeholder="e.g., 3 Target Personas"
+                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                              />
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -696,7 +704,7 @@ export default function CreateProposalPage() {
                         <div className="mb-2 flex items-center justify-between">
                           <label className="block text-xs font-semibold text-gray-700">Core Work</label>
                           <button
-                            onClick={() => handleAddCoreWork(phase.id)}
+                            onClick={() => handleAddCoreWork(phase.phaseId)}
                             className="text-xs text-red-600 hover:text-red-700"
                           >
                             + Add
@@ -708,7 +716,7 @@ export default function CreateProposalPage() {
                               key={workIndex}
                               type="text"
                               value={work}
-                              onChange={(e) => handleUpdateCoreWork(phase.id, workIndex, e.target.value)}
+                              onChange={(e) => handleUpdateCoreWork(phase.phaseId, workIndex, e.target.value)}
                               placeholder="e.g., Configure IgniteBD CRM + domain layer"
                               className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                             />
@@ -720,7 +728,7 @@ export default function CreateProposalPage() {
                         <label className="mb-1 block text-xs font-semibold text-gray-700">Outcome</label>
                         <textarea
                           value={phase.outcome}
-                          onChange={(e) => handleUpdatePhase(phase.id, { outcome: e.target.value })}
+                          onChange={(e) => handleUpdatePhase(phase.phaseId, { outcome: e.target.value })}
                           placeholder="Expected outcome..."
                           rows={2}
                           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"

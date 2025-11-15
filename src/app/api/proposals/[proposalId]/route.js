@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 import { convertProposalToDeliverables } from '@/lib/services/ProposalToDeliverablesService';
 
+/**
+ * GET /api/proposals/:proposalId
+ * Get a single proposal with phases and deliverables
+ */
 export async function GET(request, { params }) {
   try {
     await verifyFirebaseToken(request);
@@ -26,7 +30,29 @@ export async function GET(request, { params }) {
       where: { id: proposalId },
       include: {
         companyHQ: true,
-        company: true,
+        company: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        proposalPhases: {
+          include: {
+            deliverables: {
+              orderBy: { order: 'asc' },
+            },
+            phaseTemplate: true,
+          },
+          orderBy: { order: 'asc' },
+        },
       },
     });
 
@@ -54,7 +80,11 @@ export async function GET(request, { params }) {
   }
 }
 
-export async function PUT(request, { params }) {
+/**
+ * PATCH /api/proposals/:proposalId
+ * Update a proposal (supports partial updates)
+ */
+export async function PATCH(request, { params }) {
   try {
     await verifyFirebaseToken(request);
   } catch (error) {
@@ -75,6 +105,13 @@ export async function PUT(request, { params }) {
 
     const existingProposal = await prisma.proposal.findUnique({
       where: { id: proposalId },
+      include: {
+        proposalPhases: {
+          include: {
+            deliverables: true,
+          },
+        },
+      },
     });
 
     if (!existingProposal) {
@@ -86,80 +123,92 @@ export async function PUT(request, { params }) {
 
     const body = await request.json();
     const {
-      clientName,
-      clientCompany,
+      title,
+      contactId,
       companyId,
+      estimatedStart,
       purpose,
       status,
-      serviceInstances,
-      phases,
-      milestones,
-      compensation,
+      phases, // Full phases array (will replace existing)
       totalPrice,
-      preparedBy,
     } = body ?? {};
 
     const updateData = {};
-    if (clientName !== undefined) updateData.clientName = clientName;
-    if (clientCompany !== undefined) updateData.clientCompany = clientCompany;
-    if (companyId !== undefined) updateData.companyId = companyId || null;
-    if (purpose !== undefined) updateData.purpose = purpose || null;
-    if (status !== undefined) {
-      updateData.status = status;
-      
-      // If status is changing to "approved", trigger deliverables conversion
-      if (status === 'approved' && existingProposal.status !== 'approved') {
-        try {
-          const conversionResult = await convertProposalToDeliverables(proposalId);
-          console.log('✅ Proposal approved, deliverables created:', conversionResult);
-        } catch (conversionError) {
-          console.error('⚠️ Failed to convert proposal to deliverables:', conversionError);
-          // Don't fail the proposal update if conversion fails
-          // Deliverables can be created manually later
-        }
-      }
-    }
-    if (serviceInstances !== undefined) {
-      updateData.serviceInstances = serviceInstances ? JSON.parse(JSON.stringify(serviceInstances)) : null;
-    }
-    if (phases !== undefined) {
-      updateData.phases = phases ? JSON.parse(JSON.stringify(phases)) : null;
-    }
-    if (milestones !== undefined) {
-      updateData.milestones = milestones ? JSON.parse(JSON.stringify(milestones)) : null;
-    }
-    if (compensation !== undefined) {
-      updateData.compensation = compensation ? JSON.parse(JSON.stringify(compensation)) : null;
-    }
-    if (preparedBy !== undefined) {
-      updateData.preparedBy = preparedBy || null;
-    }
 
-    if (compensation !== undefined && compensation?.total) {
-      updateData.totalPrice = compensation.total;
-    } else if (serviceInstances !== undefined && Array.isArray(serviceInstances)) {
-      updateData.totalPrice = serviceInstances.reduce(
-        (sum, service) => sum + (service.price || 0),
-        0,
-      );
-    } else if (totalPrice !== undefined) {
-      updateData.totalPrice = totalPrice;
+    if (title !== undefined) updateData.title = title;
+    if (contactId !== undefined) updateData.contactId = contactId;
+    if (companyId !== undefined) updateData.companyId = companyId;
+    if (estimatedStart !== undefined) updateData.estimatedStart = new Date(estimatedStart);
+    if (purpose !== undefined) updateData.purpose = purpose;
+    if (status !== undefined) updateData.status = status;
+    if (totalPrice !== undefined) updateData.totalPrice = totalPrice;
+
+    // Handle phases update (replace all phases)
+    if (phases !== undefined && Array.isArray(phases)) {
+      // Delete existing phases (cascade will delete deliverables)
+      await prisma.proposalPhase.deleteMany({
+        where: { proposalId },
+      });
+
+      // Create new phases
+      updateData.proposalPhases = {
+        create: phases.map((phase, index) => ({
+          phaseTemplateId: phase.phaseTemplateId || null,
+          name: phase.name,
+          description: phase.description || null,
+          durationWeeks: phase.durationWeeks || 3,
+          order: phase.order !== undefined ? phase.order : index + 1,
+          deliverables: {
+            create: phase.deliverables?.map((deliverable, delIndex) => ({
+              deliverableTemplateId: deliverable.deliverableTemplateId || null,
+              name: deliverable.name,
+              description: deliverable.description || null,
+              quantity: deliverable.quantity || 1,
+              order: deliverable.order !== undefined ? deliverable.order : delIndex,
+            })) || [],
+          },
+        })),
+      };
     }
 
     const proposal = await prisma.proposal.update({
       where: { id: proposalId },
       data: updateData,
       include: {
-        companyHQ: true,
-        company: true,
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        proposalPhases: {
+          include: {
+            deliverables: {
+              orderBy: { order: 'asc' },
+            },
+            phaseTemplate: true,
+          },
+          orderBy: { order: 'asc' },
+        },
       },
     });
 
-    if (companyId !== undefined && companyId) {
-      await prisma.company.update({
-        where: { id: companyId },
-        data: { proposalId: proposal.id },
-      });
+    // If status changed to approved, convert to deliverables
+    if (status === 'approved' && existingProposal.status !== 'approved') {
+      try {
+        await convertProposalToDeliverables(proposalId);
+      } catch (conversionError) {
+        console.error('⚠️ Failed to convert proposal to deliverables:', conversionError);
+        // Don't fail the proposal update if conversion fails
+      }
     }
 
     console.log('✅ Proposal updated:', proposal.id);
@@ -181,6 +230,10 @@ export async function PUT(request, { params }) {
   }
 }
 
+/**
+ * DELETE /api/proposals/:proposalId
+ * Delete a proposal
+ */
 export async function DELETE(request, { params }) {
   try {
     await verifyFirebaseToken(request);
@@ -200,24 +253,6 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const proposal = await prisma.proposal.findUnique({
-      where: { id: proposalId },
-    });
-
-    if (!proposal) {
-      return NextResponse.json(
-        { success: false, error: 'Proposal not found' },
-        { status: 404 },
-      );
-    }
-
-    if (proposal.companyId) {
-      await prisma.company.update({
-        where: { id: proposal.companyId },
-        data: { proposalId: null },
-      });
-    }
-
     await prisma.proposal.delete({
       where: { id: proposalId },
     });
@@ -226,7 +261,7 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      message: 'Proposal deleted',
+      message: 'Proposal deleted successfully',
     });
   } catch (error) {
     console.error('❌ DeleteProposal error:', error);
@@ -240,4 +275,3 @@ export async function DELETE(request, { params }) {
     );
   }
 }
-

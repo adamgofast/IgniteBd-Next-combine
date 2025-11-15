@@ -116,7 +116,7 @@ export default function ProposalDetailPage({ params }) {
   const phases = useMemo(() => parseJson(proposal?.phases) || [], [proposal]);
   const milestones = useMemo(() => parseJson(proposal?.milestones) || [], [proposal]);
   const compensation = useMemo(() => parseJson(proposal?.compensation), [proposal]);
-  const serviceInstances = useMemo(() => parseJson(proposal?.serviceInstances) || [], [proposal]);
+  // Removed serviceInstances - deliverables are now in phases.deliverables
 
   const statusColors = {
     draft: 'bg-gray-100 text-gray-800',
@@ -296,76 +296,7 @@ export default function ProposalDetailPage({ params }) {
           )}
         </section>
 
-        {/* Services Section - Always Visible */}
-        <section className="rounded-2xl bg-white p-8 shadow">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Package className="h-6 w-6 text-red-600" />
-            Services
-          </h2>
-          {editing === 'services' ? (
-            <ServicesInlineEditor
-              services={serviceInstances}
-              onSave={async (updatedServices) => {
-                try {
-                  setSaving(true);
-                  const response = await api.put(`/api/proposals/${params.proposalId}`, {
-                    serviceInstances: updatedServices,
-                  });
-                  if (response.data?.proposal) {
-                    setProposal(response.data.proposal);
-                    setLocalData((prev) => ({ ...prev, serviceInstances: updatedServices }));
-                    setEditing(null);
-                  }
-                } catch (err) {
-                  console.error('Error saving services:', err);
-                  alert('Failed to save services. Please try again.');
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              onCancel={() => {
-                setEditing(null);
-              }}
-              saving={saving}
-            />
-          ) : (
-            <div 
-              onClick={() => proposal.status !== 'approved' && setEditing('services')}
-              className={`group ${proposal.status !== 'approved' ? 'cursor-pointer' : ''}`}
-            >
-              {serviceInstances.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {serviceInstances.map((service, index) => (
-                    <div
-                      key={index}
-                      className="rounded-lg border border-gray-200 p-4 hover:border-red-300 transition"
-                    >
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {service.name || service.title || `Service ${index + 1}`}
-                      </h3>
-                      {service.description && (
-                        <p className="text-sm text-gray-600 mb-2">{service.description}</p>
-                      )}
-                      {service.price && (
-                        <p className="text-lg font-bold text-red-600">
-                          ${service.price.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg group-hover:border-red-300 transition">
-                  <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                  <p>No services added yet.</p>
-                  {proposal.status !== 'approved' && (
-                    <p className="text-xs mt-2 text-gray-400">Click to add services</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+        {/* Services section removed - deliverables are now in phases */}
 
         {/* Scope of Work - Phases */}
         <section className="rounded-2xl bg-white p-8 shadow">

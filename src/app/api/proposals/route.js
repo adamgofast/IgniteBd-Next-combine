@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyFirebaseToken } from '@/lib/firebaseAdmin';
 
+/**
+ * POST /api/proposals
+ * Creates a new proposal with phases and deliverables
+ */
 export async function POST(request) {
   try {
     await verifyFirebaseToken(request);
@@ -16,82 +20,110 @@ export async function POST(request) {
     const body = await request.json();
     const {
       companyHQId,
-      clientName,
-      clientCompany,
+      title,
+      contactId,
       companyId,
+      estimatedStart,
       purpose,
       status = 'draft',
-      serviceInstances,
-      phases,
-      milestones,
-      compensation,
+      phases, // Array of phase objects with deliverables
       totalPrice,
-      preparedBy,
     } = body ?? {};
 
     if (!companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'CompanyHQId is required' },
+        { success: false, error: 'companyHQId is required' },
         { status: 400 },
       );
     }
 
-    if (!clientName || !clientCompany) {
+    if (!title || !contactId || !companyId || !estimatedStart) {
       return NextResponse.json(
-        { success: false, error: 'Client name and company are required' },
+        { success: false, error: 'title, contactId, companyId, and estimatedStart are required' },
         { status: 400 },
       );
     }
 
-    const companyHQ = await prisma.companyHQ.findUnique({
-      where: { id: companyHQId },
+    // Verify contact and company exist
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
     });
 
-    if (!companyHQ) {
+    if (!contact) {
       return NextResponse.json(
-        { success: false, error: 'CompanyHQ not found' },
+        { success: false, error: 'Contact not found' },
         { status: 404 },
       );
     }
 
-    let calculatedPrice = totalPrice;
-    if (!calculatedPrice && compensation?.total) {
-      calculatedPrice = compensation.total;
-    } else if (!calculatedPrice && Array.isArray(serviceInstances)) {
-      calculatedPrice = serviceInstances.reduce(
-        (sum, service) => sum + (service.price || 0),
-        0,
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company) {
+      return NextResponse.json(
+        { success: false, error: 'Company not found' },
+        { status: 404 },
       );
     }
 
+    // Create proposal with phases and deliverables
     const proposal = await prisma.proposal.create({
       data: {
         companyHQId,
-        clientName,
-        clientCompany,
-        companyId: companyId || null,
+        title,
+        contactId,
+        companyId,
+        estimatedStart: new Date(estimatedStart),
         purpose: purpose || null,
         status,
-        serviceInstances: serviceInstances ? JSON.parse(JSON.stringify(serviceInstances)) : null,
-        phases: phases ? JSON.parse(JSON.stringify(phases)) : null,
-        milestones: milestones ? JSON.parse(JSON.stringify(milestones)) : null,
-        compensation: compensation ? JSON.parse(JSON.stringify(compensation)) : null,
-        totalPrice: calculatedPrice || null,
-        preparedBy: preparedBy || null,
+        totalPrice: totalPrice || null,
         dateIssued: new Date(),
+        proposalPhases: {
+          create: phases?.map((phase, index) => ({
+            phaseTemplateId: phase.phaseTemplateId || null,
+            name: phase.name,
+            description: phase.description || null,
+            durationWeeks: phase.durationWeeks || 3,
+            order: phase.order !== undefined ? phase.order : index + 1,
+            deliverables: {
+              create: phase.deliverables?.map((deliverable, delIndex) => ({
+                deliverableTemplateId: deliverable.deliverableTemplateId || null,
+                name: deliverable.name,
+                description: deliverable.description || null,
+                quantity: deliverable.quantity || 1,
+                order: deliverable.order !== undefined ? deliverable.order : delIndex,
+              })) || [],
+            },
+          })) || [],
+        },
       },
       include: {
-        companyHQ: true,
-        company: true,
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        proposalPhases: {
+          include: {
+            deliverables: {
+              orderBy: { order: 'asc' },
+            },
+            phaseTemplate: true,
+          },
+          orderBy: { order: 'asc' },
+        },
       },
     });
-
-    if (companyId) {
-      await prisma.company.update({
-        where: { id: companyId },
-        data: { proposalId: proposal.id },
-      });
-    }
 
     console.log('✅ Proposal created:', proposal.id);
 
@@ -112,6 +144,10 @@ export async function POST(request) {
   }
 }
 
+/**
+ * GET /api/proposals
+ * List proposals for a companyHQ
+ */
 export async function GET(request) {
   try {
     await verifyFirebaseToken(request);
@@ -126,10 +162,11 @@ export async function GET(request) {
     const { searchParams } = request.nextUrl;
     const companyHQId = searchParams.get('companyHQId');
     const status = searchParams.get('status');
+    const contactId = searchParams.get('contactId');
 
     if (!companyHQId) {
       return NextResponse.json(
-        { success: false, error: 'CompanyHQId is required' },
+        { success: false, error: 'companyHQId is required' },
         { status: 400 },
       );
     }
@@ -142,11 +179,35 @@ export async function GET(request) {
       where.status = status;
     }
 
+    if (contactId) {
+      where.contactId = contactId;
+    }
+
     const proposals = await prisma.proposal.findMany({
       where,
       include: {
-        companyHQ: true,
-        company: true,
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+        proposalPhases: {
+          include: {
+            deliverables: {
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -169,4 +230,3 @@ export async function GET(request) {
     );
   }
 }
-

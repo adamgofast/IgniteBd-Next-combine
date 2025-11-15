@@ -125,25 +125,31 @@ function extractDeliverablesFromProposal(proposal) {
   const deliverables = [];
 
   // Extract from phases (if phases have deliverables array)
+  // New structure: phases have phaseId, deliverables are objects with deliverableId
   if (proposal.phases && Array.isArray(proposal.phases)) {
-    proposal.phases.forEach((phase, phaseIndex) => {
-      const phaseId = phase.id || phaseIndex + 1;
+    proposal.phases.forEach((phase) => {
+      const phaseId = phase.phaseId || phase.id; // Support both old and new format
       const category = phase.category || phase.name?.toLowerCase() || 'general';
 
       // If phase has deliverables array
       if (phase.deliverables && Array.isArray(phase.deliverables)) {
-        phase.deliverables.forEach((deliverable, delIndex) => {
+        phase.deliverables.forEach((deliverable) => {
+          // Handle both old format (string) and new format (object with deliverableId)
+          const isString = typeof deliverable === 'string';
+          const deliverableId = isString ? null : deliverable.deliverableId;
+          
           deliverables.push({
-            title:
-              typeof deliverable === 'string'
-                ? deliverable
-                : deliverable.title || `Deliverable ${delIndex + 1}`,
-            description:
-              typeof deliverable === 'string'
-                ? null
-                : deliverable.description || null,
-            category,
-            milestoneId: `phase-${phaseId}-deliverable-${delIndex + 1}`,
+            title: isString
+              ? deliverable
+              : deliverable.title || 'Untitled Deliverable',
+            description: isString
+              ? null
+              : deliverable.description || null,
+            category: isString
+              ? category
+              : deliverable.category || category,
+            type: isString ? null : deliverable.type || null,
+            milestoneId: deliverableId ? `deliverable-${deliverableId}` : null,
             dueDate: calculateDueDateFromPhase(phase, proposal.milestones),
           });
         });
@@ -151,53 +157,58 @@ function extractDeliverablesFromProposal(proposal) {
     });
   }
 
-  // Extract from milestones (if milestones have deliverables)
+  // Extract from milestones (if milestones reference deliverables by deliverableId)
   if (proposal.milestones && Array.isArray(proposal.milestones)) {
-    proposal.milestones.forEach((milestone, index) => {
-      const milestoneId = milestone.id || `milestone-${index + 1}`;
-      const week = milestone.week || index + 1;
-
-      // If milestone has deliverable field
-      if (milestone.deliverable) {
+    proposal.milestones.forEach((milestone) => {
+      const week = milestone.week;
+      
+      // New structure: milestone has deliverableId reference
+      if (milestone.deliverableId) {
+        // Find the deliverable in phases by deliverableId
+        let foundDeliverable = null;
+        if (proposal.phases && Array.isArray(proposal.phases)) {
+          for (const phase of proposal.phases) {
+            if (phase.deliverables && Array.isArray(phase.deliverables)) {
+              foundDeliverable = phase.deliverables.find(
+                d => d.deliverableId === milestone.deliverableId
+              );
+              if (foundDeliverable) break;
+            }
+          }
+        }
+        
+        if (foundDeliverable) {
+          deliverables.push({
+            title: foundDeliverable.title || milestone.milestone || `Week ${week}`,
+            description: foundDeliverable.description || null,
+            category: foundDeliverable.category || milestone.phaseColor || 'general',
+            type: foundDeliverable.type || null,
+            milestoneId: `week-${week}`,
+            dueDate: calculateDueDateFromMilestone(milestone, proposal.dateIssued),
+          });
+        }
+      } else if (milestone.deliverable) {
+        // Old format: milestone has deliverable field (string)
         deliverables.push({
-          title:
-            typeof milestone.deliverable === 'string'
-              ? milestone.deliverable
-              : milestone.milestone || `Milestone ${week}`,
-          description:
-            typeof milestone.deliverable === 'string'
-              ? null
-              : milestone.description || null,
+          title: typeof milestone.deliverable === 'string'
+            ? milestone.deliverable
+            : milestone.milestone || `Week ${week}`,
+          description: milestone.description || null,
           category: milestone.phaseColor || milestone.phase?.toLowerCase() || 'general',
           milestoneId: `week-${week}`,
           dueDate: calculateDueDateFromMilestone(milestone, proposal.dateIssued),
         });
       } else if (milestone.milestone) {
-        // Use milestone title as deliverable
+        // Fallback: use milestone title
         deliverables.push({
           title: milestone.milestone,
-          description: milestone.deliverable || null,
+          description: null,
           category: milestone.phaseColor || milestone.phase?.toLowerCase() || 'general',
           milestoneId: `week-${week}`,
           dueDate: calculateDueDateFromMilestone(milestone, proposal.dateIssued),
         });
       }
     });
-  }
-
-  // If no deliverables found in phases or milestones, create from serviceInstances
-  if (deliverables.length === 0 && proposal.serviceInstances) {
-    if (Array.isArray(proposal.serviceInstances)) {
-      proposal.serviceInstances.forEach((service, index) => {
-        deliverables.push({
-          title: service.name || service.title || `Service ${index + 1}`,
-          description: service.description || null,
-          category: service.category || 'general',
-          milestoneId: `service-${index + 1}`,
-          dueDate: null, // No due date if not in milestones
-        });
-      });
-    }
   }
 
   return deliverables;
