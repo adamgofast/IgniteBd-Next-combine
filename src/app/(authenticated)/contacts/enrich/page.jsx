@@ -21,7 +21,7 @@ import api from '@/lib/api';
 export default function EnrichPage() {
   const router = useRouter();
   const [companyHQId, setCompanyHQId] = useState('');
-  const [mode, setMode] = useState('search'); // 'search', 'csv', 'microsoft'
+  const [mode, setMode] = useState('search'); // 'search', 'csv', 'microsoft', 'existing'
   const [searchType, setSearchType] = useState('email'); // 'email' or 'linkedin'
   const [searchEmail, setSearchEmail] = useState('');
   const [searchLinkedInUrl, setSearchLinkedInUrl] = useState('');
@@ -43,6 +43,41 @@ export default function EnrichPage() {
       '';
     setCompanyHQId(storedCompanyHQId);
   }, []);
+
+  // Search for existing contact in CRM by email
+  const handleSearchExistingContact = useCallback(async () => {
+    if (!searchEmail || !searchEmail.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    if (!companyHQId) {
+      alert('Company context is required');
+      return;
+    }
+
+    setSearching(true);
+    setFoundContact(null);
+
+    try {
+      const response = await api.get(
+        `/api/contacts/by-email?email=${encodeURIComponent(searchEmail)}&companyHQId=${companyHQId}`
+      );
+
+      if (response.data?.success && response.data.contact) {
+        setFoundContact(response.data.contact);
+      } else {
+        alert('Contact not found in your CRM. Use "Lookup & Enrich" to add new contacts.');
+        setFoundContact(null);
+      }
+    } catch (error) {
+      console.error('Error searching existing contact:', error);
+      alert('Failed to search for contact. Please try again.');
+      setFoundContact(null);
+    } finally {
+      setSearching(false);
+    }
+  }, [searchEmail, companyHQId]);
 
   // Search for existing contact by email or LinkedIn URL
   const handleSearchContact = useCallback(async () => {
@@ -279,6 +314,13 @@ export default function EnrichPage() {
           linkedinUrl: foundContact.linkedinUrl,
           contactId: foundContact.id 
         });
+      } else if (mode === 'existing' && foundContact) {
+        // Existing CRM contact - use internal enrichment endpoint
+        contactsToEnrich.push({ 
+          email: foundContact.email, 
+          linkedinUrl: foundContact.linkedinUrl,
+          contactId: foundContact.id 
+        });
       } else if (mode === 'csv') {
       csvContacts
         .filter((c) => selectedContacts.has(c.email))
@@ -437,7 +479,7 @@ export default function EnrichPage() {
         </div>
 
         {/* Mode Selection */}
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <button
             type="button"
             onClick={() => {
@@ -506,6 +548,28 @@ export default function EnrichPage() {
               Get contacts from Microsoft email
             </p>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode('existing');
+              setFoundContact(null);
+              setSearchEmail('');
+            }}
+            className={`rounded-xl border-2 p-6 text-left transition ${
+              mode === 'existing'
+                ? 'border-orange-500 bg-orange-50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            <User className={`mb-3 h-8 w-8 ${mode === 'existing' ? 'text-orange-600' : 'text-gray-400'}`} />
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+              Individual You Want to Enrich
+            </h3>
+            <p className="text-sm text-gray-600">
+              Search for existing contact in your CRM
+            </p>
+          </button>
         </div>
 
         {/* Search Mode */}
@@ -553,26 +617,32 @@ export default function EnrichPage() {
               </button>
             </div>
 
-            <div className="flex gap-4">
-              {searchType === 'email' ? (
-                <input
-                  type="email"
-                  placeholder="Enter email address"
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <input
-                  type="url"
-                  placeholder="Enter LinkedIn URL (e.g., https://linkedin.com/in/john-doe)"
-                  value={searchLinkedInUrl}
-                  onChange={(e) => setSearchLinkedInUrl(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="flex flex-col gap-4">
+              {searchType === 'linkedin' && (
+                <p className="text-sm text-gray-600 italic">
+                  Let's help you find your next lead
+                </p>
               )}
+              <div className="flex gap-4">
+                {searchType === 'email' ? (
+                  <input
+                    type="email"
+                    placeholder="Enter email address"
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                ) : (
+                  <input
+                    type="url"
+                    placeholder="Enter LinkedIn URL (e.g., https://linkedin.com/in/john-doe)"
+                    value={searchLinkedInUrl}
+                    onChange={(e) => setSearchLinkedInUrl(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
+                    className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
               <button
                 type="button"
                 onClick={handleSearchContact}
@@ -914,6 +984,130 @@ export default function EnrichPage() {
                 )}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Existing Contact Mode */}
+        {mode === 'existing' && (
+          <div className="mb-8 rounded-xl bg-white p-6 shadow-lg">
+            <h2 className="mb-4 text-xl font-semibold text-gray-900">
+              Individual You Want to Enrich
+            </h2>
+            <p className="mb-6 text-sm text-gray-600">
+              Search for an existing contact in your CRM by email address
+            </p>
+
+            <div className="mb-6 flex gap-4">
+              <input
+                type="email"
+                placeholder="Enter email address..."
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && searchEmail && searchEmail.includes('@')) {
+                    handleSearchExistingContact();
+                  }
+                }}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleSearchExistingContact}
+                disabled={searching || !searchEmail || !searchEmail.includes('@')}
+                className="rounded-lg bg-orange-600 px-6 py-3 font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {searching ? (
+                  <>
+                    <RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 inline h-4 w-4" />
+                    Search CRM
+                  </>
+                )}
+              </button>
+            </div>
+
+            {foundContact && (
+              <div className="mt-6 rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
+                <div className="mb-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Contact Found</h3>
+                    <button
+                      type="button"
+                      onClick={() => setFoundContact(null)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      <User className="h-5 w-5 text-gray-400" />
+                      <span className="text-sm font-semibold text-gray-700">Name</span>
+                    </div>
+                    <div className="text-base font-semibold text-gray-900">
+                      {foundContact.firstName} {foundContact.lastName}
+                    </div>
+                  </div>
+
+                  {foundContact.email && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-700">Email</span>
+                      </div>
+                      <div className="text-sm text-gray-600">{foundContact.email}</div>
+                    </div>
+                  )}
+
+                  {foundContact.title && (
+                    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+                      <div className="text-sm font-semibold text-gray-700">Title</div>
+                      <div className="text-sm text-gray-600">{foundContact.title}</div>
+                    </div>
+                  )}
+
+                  <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                    <div className="flex items-center gap-2 text-sm text-green-700">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Existing contact in your CRM - will be enriched</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-orange-200 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setFoundContact(null)}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEnrich}
+                    disabled={enriching}
+                    className="flex items-center gap-2 rounded-lg bg-orange-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {enriching ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Enriching...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Enrich This Contact
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
