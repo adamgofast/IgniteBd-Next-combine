@@ -55,6 +55,16 @@ export default function ProductCreatePage() {
         throw new Error(response.data.error);
       }
 
+      const newProduct = response.data?.product;
+      
+      // Immediately save to localStorage (hydration pattern)
+      if (newProduct && typeof window !== 'undefined') {
+        const cached = window.localStorage.getItem('products');
+        const existing = cached ? JSON.parse(cached) : [];
+        const updated = [...existing, newProduct];
+        window.localStorage.setItem('products', JSON.stringify(updated));
+      }
+
       setSuccess(true);
       setForm({
         name: '',

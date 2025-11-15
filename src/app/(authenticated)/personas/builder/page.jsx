@@ -170,6 +170,18 @@ export default function PersonaBuilderPage({ searchParams }) {
         throw new Error('Persona save response was missing data.');
       }
 
+      // Immediately save to localStorage (hydration pattern)
+      if (typeof window !== 'undefined') {
+        const cached = window.localStorage.getItem('personas');
+        const existing = cached ? JSON.parse(cached) : [];
+        // Update if exists, otherwise add
+        const existingIndex = existing.findIndex(p => p.id === savedPersona.id);
+        const updated = existingIndex >= 0
+          ? existing.map((p, i) => i === existingIndex ? savedPersona : p)
+          : [...existing, savedPersona];
+        window.localStorage.setItem('personas', JSON.stringify(updated));
+      }
+
       handleShowToast('Persona saved.', () => {
         router.push('/personas');
       });

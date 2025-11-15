@@ -17,11 +17,37 @@ export default function WorkPackagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Load from localStorage first (dashboard pattern - no auto-fetch)
   useEffect(() => {
-    loadWorkPackages();
+    if (typeof window === 'undefined') return;
+    
+    const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
+    
+    if (!companyHQId) {
+      setError('CompanyHQ ID not found');
+      setLoading(false);
+      return;
+    }
+
+    // Load from localStorage first
+    const cached = window.localStorage.getItem('workPackages');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          // Filter by companyHQId if needed
+          const filtered = parsed.filter(wp => wp.companyHQId === companyHQId);
+          setWorkPackages(filtered);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached work packages', error);
+      }
+    }
+    setLoading(false);
   }, []);
 
-  const loadWorkPackages = async () => {
+  // Optional: Manual refresh function (for sync button if needed)
+  const refreshWorkPackages = async () => {
     try {
       setLoading(true);
       const companyHQId = localStorage.getItem('companyHQId') || localStorage.getItem('companyId') || '';
@@ -33,7 +59,13 @@ export default function WorkPackagesPage() {
 
       const response = await api.get(`/api/workpackages?companyHQId=${companyHQId}`);
       if (response.data?.success) {
-        setWorkPackages(response.data.workPackages || []);
+        const fetched = response.data.workPackages || [];
+        setWorkPackages(fetched);
+        
+        // Update localStorage
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('workPackages', JSON.stringify(fetched));
+        }
       }
     } catch (err) {
       console.error('Error loading work packages:', err);

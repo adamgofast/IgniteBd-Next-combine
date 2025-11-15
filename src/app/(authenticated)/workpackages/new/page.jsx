@@ -116,7 +116,17 @@ export default function NewWorkPackagePage() {
       });
 
       if (response.data?.success) {
-        router.push(`/workpackages/${response.data.workPackage.id}`);
+        const newWorkPackage = response.data.workPackage;
+        
+        // Immediately save to localStorage (hydration pattern)
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem('workPackages');
+          const existing = cached ? JSON.parse(cached) : [];
+          const updated = [...existing, newWorkPackage];
+          window.localStorage.setItem('workPackages', JSON.stringify(updated));
+        }
+        
+        router.push(`/workpackages/${newWorkPackage.id}`);
       } else {
         setError(response.data?.error || 'Failed to create work package');
       }

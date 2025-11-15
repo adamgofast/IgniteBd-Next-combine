@@ -149,6 +149,25 @@ export default function AddDeliverablePage() {
       );
 
       await Promise.all(promises);
+      
+      // Update work package in localStorage (hydration pattern)
+      if (typeof window !== 'undefined') {
+        try {
+          const response = await api.get(`/api/workpackages/${workPackageId}`);
+          if (response.data?.success) {
+            const updated = response.data.workPackage;
+            const cached = window.localStorage.getItem('workPackages');
+            const existing = cached ? JSON.parse(cached) : [];
+            const updatedList = existing.map(wp => 
+              wp.id === workPackageId ? updated : wp
+            );
+            window.localStorage.setItem('workPackages', JSON.stringify(updatedList));
+          }
+        } catch (err) {
+          console.warn('Failed to update work package in localStorage', err);
+        }
+      }
+      
       router.push(`/workpackages/${workPackageId}`);
     } catch (err) {
       console.error('Error adding deliverables:', err);
@@ -212,6 +231,25 @@ export default function AddDeliverablePage() {
       );
 
       await Promise.all(promises);
+      
+      // Update work package in localStorage (hydration pattern)
+      if (typeof window !== 'undefined') {
+        try {
+          const response = await api.get(`/api/workpackages/${workPackageId}`);
+          if (response.data?.success) {
+            const updated = response.data.workPackage;
+            const cached = window.localStorage.getItem('workPackages');
+            const existing = cached ? JSON.parse(cached) : [];
+            const updatedList = existing.map(wp => 
+              wp.id === workPackageId ? updated : wp
+            );
+            window.localStorage.setItem('workPackages', JSON.stringify(updatedList));
+          }
+        } catch (err) {
+          console.warn('Failed to update work package in localStorage', err);
+        }
+      }
+      
       router.push(`/workpackages/${workPackageId}`);
     } catch (err) {
       console.error('Error adding deliverables from proposal:', err);

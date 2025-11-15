@@ -260,7 +260,17 @@ export default function NewProposalPage() {
       });
 
       if (response.data?.success) {
-        router.push(`/client-operations/proposals/${response.data.proposal.id}`);
+        const newProposal = response.data.proposal;
+        
+        // Immediately save to localStorage (hydration pattern)
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem('proposals');
+          const existing = cached ? JSON.parse(cached) : [];
+          const updated = [...existing, newProposal];
+          window.localStorage.setItem('proposals', JSON.stringify(updated));
+        }
+        
+        router.push(`/client-operations/proposals/${newProposal.id}`);
       }
     } catch (err) {
       console.error('Save error:', err);
