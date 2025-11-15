@@ -1008,14 +1008,16 @@ export default function EnrichPage() {
           </div>
         )}
 
-        {/* Enrich Button */}
-        {(foundContact || (allContacts.length > 0 && selectedContacts.size > 0)) && (
+        {/* 🚫 NEVER show bulk enrich bar during LinkedIn search mode */}
+        {/* LinkedIn search uses handleEnrichContact (external only) - this bar is for CSV/Microsoft/Existing modes */}
+        {mode !== 'search' &&
+          (foundContact || (allContacts.length > 0 && selectedContacts.size > 0)) && (
           <div className="rounded-xl bg-white p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Ready to Enrich</h3>
                 <p className="text-sm text-gray-600">
-                  {mode === 'search'
+                  {mode === 'existing'
                     ? '1 contact selected'
                     : `${selectedContacts.size} contact${selectedContacts.size !== 1 ? 's' : ''} selected`}
                 </p>
