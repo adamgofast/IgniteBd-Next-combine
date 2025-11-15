@@ -31,7 +31,7 @@ function getOpenAIClient(): OpenAI {
  */
 export async function POST(
   request: Request,
-  { params }: { params: { personaId: string } }
+  { params }: { params: Promise<{ personaId: string }> }
 ) {
   try {
     await verifyFirebaseToken(request);
@@ -43,7 +43,7 @@ export async function POST(
   }
 
   try {
-    const { personaId } = params;
+    const { personaId } = await params;
 
     // Fetch persona with product fit
     const persona = await prisma.persona.findUnique({
