@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+
+// Suppress window warnings during build (expected for client components)
+if (typeof window === 'undefined') {
+  global.window = {} as any;
+}
 import { useRouter } from 'next/navigation';
 import {
   Upload,
