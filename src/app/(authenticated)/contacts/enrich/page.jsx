@@ -1,11 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-
-// Suppress window warnings during build (expected for client components)
-if (typeof window === 'undefined') {
-  global.window = {} as any;
-}
 import { useRouter } from 'next/navigation';
 import {
   Upload,
@@ -581,7 +576,9 @@ export default function EnrichPage() {
         {mode === 'search' && (
           <div className="mb-8 rounded-xl bg-white p-6 shadow-lg">
             <h2 className="mb-4 text-xl font-semibold text-gray-900">
-              {searchType === 'linkedin' ? 'Lookup LinkedIn Profile' : 'Search for a Contact'}
+              {searchType === 'linkedin' 
+                ? 'Lookup & Enrich LinkedIn Profile' 
+                : 'Find & Enrich Contact by Email'}
             </h2>
             
             {/* Search Type Toggle */}
@@ -622,7 +619,12 @@ export default function EnrichPage() {
               </button>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              {searchType === 'email' && (
+                <p className="text-sm text-gray-600">
+                  Enter an email to find and enrich contact details from Apollo
+                </p>
+              )}
               {searchType === 'linkedin' && (
                 <p className="text-sm text-gray-600 italic">
                   Let's help you find your next lead
@@ -632,7 +634,8 @@ export default function EnrichPage() {
                 {searchType === 'email' ? (
                   <input
                     type="email"
-                    placeholder="Enter email address"
+                    autoComplete="off"
+                    placeholder="Enter email to enrich contact (e.g., john@company.com)"
                     value={searchEmail}
                     onChange={(e) => setSearchEmail(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
@@ -641,7 +644,8 @@ export default function EnrichPage() {
                 ) : (
                   <input
                     type="url"
-                    placeholder="Enter LinkedIn URL (e.g., https://linkedin.com/in/john-doe)"
+                    autoComplete="off"
+                    placeholder="Enter LinkedIn URL to enrich contact (e.g., https://linkedin.com/in/john-doe)"
                     value={searchLinkedInUrl}
                     onChange={(e) => setSearchLinkedInUrl(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearchContact()}
@@ -657,12 +661,12 @@ export default function EnrichPage() {
                 {searching ? (
                   <>
                     <RefreshCw className="mr-2 inline h-4 w-4 animate-spin" />
-                    {searchType === 'linkedin' ? 'Looking up...' : 'Searching...'}
+                    {searchType === 'linkedin' ? 'Looking up...' : 'Finding contact...'}
                   </>
                 ) : (
                   <>
-                    <Search className="mr-2 inline h-4 w-4" />
-                    {searchType === 'linkedin' ? 'Lookup' : 'Search'}
+                    <Sparkles className="mr-2 inline h-4 w-4" />
+                    {searchType === 'linkedin' ? 'Lookup & Enrich' : 'Find & Enrich'}
                   </>
                 )}
               </button>
