@@ -37,13 +37,20 @@ export async function GET(request, { params }) {
             email: true,
           },
         },
-        contactCompany: {
-          select: {
-            id: true,
-            companyName: true,
+        phases: {
+          include: {
+            items: {
+              include: {
+                collateral: true,
+              },
+            },
           },
+          orderBy: { position: 'asc' },
         },
         items: {
+          include: {
+            collateral: true,
+          },
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -99,17 +106,10 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const body = await request.json();
-    const { title, description, status } = body ?? {};
-
-    const updateData = {};
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (status !== undefined) updateData.status = status;
-
-    const workPackage = await prisma.workPackage.update({
+    // WorkPackage is now just a container - no fields to update
+    // Use phases/items routes for updates
+    const workPackage = await prisma.workPackage.findUnique({
       where: { id },
-      data: updateData,
       include: {
         contact: {
           select: {
@@ -119,13 +119,20 @@ export async function PATCH(request, { params }) {
             email: true,
           },
         },
-        contactCompany: {
-          select: {
-            id: true,
-            companyName: true,
+        phases: {
+          include: {
+            items: {
+              include: {
+                collateral: true,
+              },
+            },
           },
+          orderBy: { position: 'asc' },
         },
         items: {
+          include: {
+            collateral: true,
+          },
           orderBy: { createdAt: 'asc' },
         },
       },

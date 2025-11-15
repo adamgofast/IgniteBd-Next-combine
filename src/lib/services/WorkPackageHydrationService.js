@@ -2,7 +2,8 @@ import { prisma } from '../prisma';
 
 /**
  * Hydrate WorkPackage with artifacts and calculate progress
- * @param {Object} workPackage - WorkPackage from Prisma
+ * Uses Collateral model to link artifacts to items
+ * @param {Object} workPackage - WorkPackage from Prisma (with collateral already included)
  * @param {Object} options - Options for hydration
  * @param {boolean} options.clientView - If true, only return published artifacts
  * @returns {Promise<Object>} - Hydrated work package with progress
@@ -10,132 +11,104 @@ import { prisma } from '../prisma';
 export async function hydrateWorkPackage(workPackage, options = {}) {
   const { clientView = false } = options;
 
-  // Hydrate each item with its artifacts
+  // Hydrate each item with its artifacts from collateral
   const hydratedItems = await Promise.all(
     workPackage.items.map(async (item) => {
-      let artifacts = [];
+      const collateral = item.collateral || [];
+      const artifacts = [];
       let completedCount = 0;
 
-      // Load artifacts based on type
-      switch (item.type) {
-        case 'BLOG':
-          if (item.blogIds.length > 0) {
-            artifacts = await prisma.blog.findMany({
-              where: {
-                id: { in: item.blogIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
-          }
-          completedCount = clientView
-            ? artifacts.length
-            : item.blogIds.length;
-          break;
+      // Load artifacts based on collateral type
+      for (const coll of collateral) {
+        try {
+          let artifact = null;
 
-        case 'PERSONA':
-          if (item.personaIds.length > 0) {
-            artifacts = await prisma.persona.findMany({
-              where: {
-                id: { in: item.personaIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
-          }
-          completedCount = clientView
-            ? artifacts.length
-            : item.personaIds.length;
-          break;
+          switch (coll.collateralType) {
+            case 'blog':
+              artifact = await prisma.blog.findUnique({
+                where: { id: coll.collateralRefId },
+              });
+              if (artifact && (!clientView || artifact.published)) {
+                artifacts.push({ ...artifact, collateralType: 'blog' });
+                completedCount++;
+              }
+              break;
 
-        case 'OUTREACH_TEMPLATE':
-          if (item.templateIds.length > 0) {
-            artifacts = await prisma.template.findMany({
-              where: {
-                id: { in: item.templateIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
-          }
-          completedCount = clientView
-            ? artifacts.length
-            : item.templateIds.length;
-          break;
+            case 'persona':
+              artifact = await prisma.persona.findUnique({
+                where: { id: coll.collateralRefId },
+              });
+              if (artifact && (!clientView || artifact.published)) {
+                artifacts.push({ ...artifact, collateralType: 'persona' });
+                completedCount++;
+              }
+              break;
 
-        case 'EVENT_CLE_PLAN':
-          if (item.eventPlanIds.length > 0) {
-            artifacts = await prisma.eventPlan.findMany({
-              where: {
-                id: { in: item.eventPlanIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
-          }
-          completedCount = clientView
-            ? artifacts.length
-            : item.eventPlanIds.length;
-          break;
+            case 'template':
+              artifact = await prisma.template.findUnique({
+                where: { id: coll.collateralRefId },
+              });
+              if (artifact && (!clientView || artifact.published)) {
+                artifacts.push({ ...artifact, collateralType: 'template' });
+                completedCount++;
+              }
+              break;
 
-        case 'CLE_DECK':
-          if (item.cleDeckIds.length > 0) {
-            artifacts = await prisma.cleDeck.findMany({
-              where: {
-                id: { in: item.cleDeckIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
-          }
-          completedCount = clientView
-            ? artifacts.length
-            : item.cleDeckIds.length;
-          break;
+            case 'deck':
+            case 'event_targets':
+              artifact = await prisma.cleDeck.findUnique({
+                where: { id: coll.collateralRefId },
+              });
+              if (artifact && (!clientView || artifact.published)) {
+                artifacts.push({ ...artifact, collateralType: coll.collateralType });
+                completedCount++;
+              }
+              break;
 
-        case 'LANDING_PAGE':
-          if (item.landingPageIds.length > 0) {
-            artifacts = await prisma.landingPage.findMany({
-              where: {
-                id: { in: item.landingPageIds },
-                ...(clientView ? { published: true } : {}),
-              },
-            });
+            case 'page':
+            case 'lead_form':
+              artifact = await prisma.landingPage.findUnique({
+                where: { id: coll.collateralRefId },
+              });
+              if (artifact && (!clientView || artifact.published)) {
+                artifacts.push({ ...artifact, collateralType: coll.collateralType });
+                completedCount++;
+              }
+              break;
           }
-          completedCount = clientView
-            ? artifacts.length
-            : item.landingPageIds.length;
-          break;
-
-        default:
-          completedCount = 0;
+        } catch (error) {
+          console.warn(`Failed to load artifact ${coll.collateralRefId} of type ${coll.collateralType}:`, error);
+        }
       }
 
-      // Calculate progress
-      const progress = item.quantity > 0 ? completedCount / item.quantity : 0;
+      const progress = {
+        completed: completedCount,
+        total: item.quantity,
+        percentage: item.quantity > 0 ? Math.round((completedCount / item.quantity) * 100) : 0,
+      };
 
       return {
-        id: item.id,
-        label: item.label,
-        type: item.type,
-        quantity: item.quantity,
-        status: item.status,
-        clientArtifactId: item.clientArtifactId,
-        completedCount,
-        progress: Math.min(progress, 1), // Cap at 100%
-        progressPercentage: Math.round(Math.min(progress, 1) * 100),
+        ...item,
         artifacts,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
+        progress,
       };
-    }),
+    })
   );
 
+  // Calculate overall progress
+  const totalItems = hydratedItems.length;
+  const completedItems = hydratedItems.filter(
+    (item) => item.progress.completed >= item.progress.total
+  ).length;
+  const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
   return {
-    id: workPackage.id,
-    title: workPackage.title,
-    description: workPackage.description,
-    status: workPackage.status,
-    contact: workPackage.contact,
-    contactCompany: workPackage.contactCompany,
+    ...workPackage,
     items: hydratedItems,
-    createdAt: workPackage.createdAt,
-    updatedAt: workPackage.updatedAt,
+    progress: {
+      completed: completedItems,
+      total: totalItems,
+      percentage: overallProgress,
+    },
   };
 }
-

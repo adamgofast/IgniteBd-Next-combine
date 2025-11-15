@@ -86,7 +86,6 @@ model CompanyHQ {
   deliverables         ConsultantDeliverable[] // Client delivery deliverables
   phaseTemplates       PhaseTemplate[]
   deliverableTemplates DeliverableTemplate[]
-  workPackages         WorkPackage[] // Work packages scoped to this HQ
   blogs                Blog[]
   templates            Template[]
   eventPlans           EventPlan[]
@@ -488,50 +487,82 @@ enum WorkItemStatus {
 }
 
 model WorkPackage {
-  id               String     @id @default(cuid())
-  contactId        String
-  contact          Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  contactCompanyId String?
-  contactCompany   Company?   @relation(fields: [contactCompanyId], references: [id], onDelete: SetNull)
-  companyHQId      String?
-  companyHQ        CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  title       String
-  description String?
-  status      WorkPackageStatus @default(ACTIVE)
+  phases WorkPackagePhase[]
+  items  WorkPackageItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  @@index([contactId])
+  @@map("work_packages")
+}
+
+model WorkPackagePhase {
+  id            String      @id @default(cuid())
+  workPackageId String
+  workPackage   WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+
+  name     String // "Phase 1 — Foundation"
+  position Int // 1,2,3
+  timeline String? // "Weeks 1–3", optional string
 
   items WorkPackageItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([contactId])
-  @@index([contactCompanyId])
-  @@index([companyHQId])
-  @@map("work_packages")
+  @@index([workPackageId])
+  @@index([position])
+  @@map("work_package_phases")
 }
 
 model WorkPackageItem {
-  id            String          @id @default(cuid())
-  workPackageId String
-  workPackage   WorkPackage     @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(cuid())
+  workPackageId      String
+  workPackage        WorkPackage       @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackagePhaseId String?
+  workPackagePhase   WorkPackagePhase? @relation(fields: [workPackagePhaseId], references: [id], onDelete: SetNull)
 
-  // What we owe
-  type            WorkItemType
-  label           String          // e.g. "Blog Posts", "Personas"
-  quantity        Int             // number owed
-  status          WorkItemStatus  @default(TODO)
-  
-  // Generated artifact (single ID - created when user clicks "Generate")
-  clientArtifactId String?        // Links to generated artifact (Blog, Persona, etc.)
+  itemType        String // persona | template | blog | deck | event_targets | page | lead_form
+  itemLabel       String // human-facing ("CLE Presentation")
+  itemDescription String?
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  quantity Int
+  status   String @default("todo") // todo | in_progress | completed
+
+  collateral Collateral[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workPackageId])
-  @@index([type])
+  @@index([workPackagePhaseId])
+  @@index([itemType])
   @@index([status])
   @@map("work_package_items")
+}
+
+model Collateral {
+  id                String          @id @default(cuid())
+  workPackageItemId String
+  workPackageItem   WorkPackageItem @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
+
+  collateralType  String // blog | persona | template | deck | event_targets | page | lead_form
+  collateralRefId String // FK to clientBlogId, clientPersonaId, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workPackageItemId])
+  @@index([collateralType])
+  @@index([collateralRefId])
+  @@map("collateral")
 }
 
 // Artifact Models (standalone content models)

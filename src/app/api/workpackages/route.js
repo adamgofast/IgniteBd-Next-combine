@@ -23,88 +23,50 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const {
-      id, // If provided, update existing
-      contactId,
-      contactCompanyId,
-      companyHQId,
-      title,
-      description,
-      status = 'ACTIVE',
-    } = body ?? {};
+    const { contactId } = body ?? {};
 
-    if (!title) {
+    if (!contactId) {
       return NextResponse.json(
-        { success: false, error: 'title is required' },
+        { success: false, error: 'contactId is required' },
         { status: 400 },
       );
     }
 
-    // If contactId provided, verify it exists
-    let contact = null;
-    if (contactId) {
-      contact = await prisma.contact.findUnique({
-        where: { id: contactId },
-      });
+    // Verify contact exists
+    const contact = await prisma.contact.findUnique({
+      where: { id: contactId },
+    });
 
-      if (!contact) {
-        return NextResponse.json(
-          { success: false, error: 'Contact not found' },
-          { status: 404 },
-        );
-      }
-    }
-
-    // companyHQId is required if no contactId
-    if (!contactId && !companyHQId) {
+    if (!contact) {
       return NextResponse.json(
-        { success: false, error: 'Either contactId or companyHQId is required' },
-        { status: 400 },
+        { success: false, error: 'Contact not found' },
+        { status: 404 },
       );
     }
 
-    // Upsert WorkPackage (simple container)
-    const workPackage = id
-      ? await prisma.workPackage.update({
-          where: { id },
-          data: {
-            title,
-            description: description || null,
-            status,
+    // Create WorkPackage (simple container)
+    const workPackage = await prisma.workPackage.create({
+      data: {
+        contactId,
+      },
+      include: {
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
+        },
+        phases: {
           include: {
-            contact: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
             items: true,
           },
-        })
-      : await prisma.workPackage.create({
-          data: {
-            contactId: contactId || null,
-            contactCompanyId: contactCompanyId || null,
-            companyHQId: companyHQId || contact?.crmId || null,
-            title,
-            description: description || null,
-            status,
-          },
-          include: {
-            contact: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-            items: true,
-          },
-        });
+          orderBy: { position: 'asc' },
+        },
+        items: true,
+      },
+    });
 
     console.log('✅ WorkPackage saved:', workPackage.id);
 
@@ -184,7 +146,6 @@ export async function GET(request) {
     // List WorkPackages
     const where = {};
     if (contactId) where.contactId = contactId;
-    if (companyHQId) where.companyHQId = companyHQId;
 
     const workPackages = await prisma.workPackage.findMany({
       where,
@@ -196,6 +157,12 @@ export async function GET(request) {
             lastName: true,
             email: true,
           },
+        },
+        phases: {
+          include: {
+            items: true,
+          },
+          orderBy: { position: 'asc' },
         },
         items: true,
       },
@@ -220,3 +187,4 @@ export async function GET(request) {
     );
   }
 }
+
