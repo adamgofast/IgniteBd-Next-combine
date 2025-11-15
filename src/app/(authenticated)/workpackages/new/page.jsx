@@ -18,10 +18,12 @@ export default function NewWorkPackagePage() {
   });
   const [contactId, setContactId] = useState('');
   const [companyHQId, setCompanyHQId] = useState('');
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Get companyHQId from localStorage (dashboard pattern)
+  // Get companyHQId and contacts from localStorage (dashboard pattern - no hydration)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedCompanyHQId =
@@ -30,10 +32,23 @@ export default function NewWorkPackagePage() {
         '';
       setCompanyHQId(storedCompanyHQId);
 
-      // Optionally get contactId from localStorage if available
+      // Get contactId from localStorage if available
       const storedContactId = window.localStorage.getItem('contactId') || '';
       if (storedContactId) {
         setContactId(storedContactId);
+      }
+
+      // Load contacts from localStorage (dashboard pattern - no API call)
+      const cachedContacts = window.localStorage.getItem('contacts');
+      if (cachedContacts) {
+        try {
+          const parsed = JSON.parse(cachedContacts);
+          if (Array.isArray(parsed)) {
+            setContacts(parsed);
+          }
+        } catch (error) {
+          console.warn('Failed to parse cached contacts', error);
+        }
       }
     }
   }, []);
@@ -48,6 +63,11 @@ export default function NewWorkPackagePage() {
     
     if (!formData.title.trim()) {
       setError('Title is required');
+      return;
+    }
+
+    if (!contactId) {
+      setError('Please select a client contact');
       return;
     }
 
@@ -107,6 +127,43 @@ export default function NewWorkPackagePage() {
 
         <form onSubmit={handleSubmit} className="rounded-lg border border-gray-200 bg-white p-6 shadow">
           <div className="space-y-6">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Client Contact <span className="text-red-600">*</span>
+              </label>
+              {loadingContacts ? (
+                <div className="w-full rounded-lg border border-gray-300 px-4 py-2 bg-gray-50">
+                  <p className="text-sm text-gray-500">Loading contacts...</p>
+                </div>
+              ) : (
+                <select
+                  value={contactId}
+                  onChange={(e) => {
+                    setContactId(e.target.value);
+                    if (error) setError('');
+                    // Store in localStorage
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('contactId', e.target.value);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  required
+                >
+                  <option value="">Select a client contact...</option>
+                  {contacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.firstName} {contact.lastName} {contact.email ? `(${contact.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {contacts.length === 0 && !loadingContacts && (
+                <p className="mt-1 text-xs text-gray-500">
+                  No contacts found. Create a contact first.
+                </p>
+              )}
+            </div>
+
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Title <span className="text-red-600">*</span>
