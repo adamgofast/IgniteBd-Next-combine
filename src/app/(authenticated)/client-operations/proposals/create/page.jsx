@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { useProposals } from '../layout';
-import { Plus, X, Package, Calendar, RefreshCw, Search, Mail, User, Save, DollarSign, FileText } from 'lucide-react';
+import { Upload, FileText, Copy, Plus, User, Search, RefreshCw, CheckCircle, X } from 'lucide-react';
 import api from '@/lib/api';
 import { getContactsRegistry } from '@/lib/services/contactsRegistry';
 
-export default function CreateProposalPage() {
+/**
+ * Proposal Start Landing Page
+ * 4-option screen after contact selection
+ */
+function ProposalStartContent() {
   const router = useRouter();
-  const { addProposal, companyHQId } = useProposals();
   const [registry] = useState(() => getContactsRegistry());
 
   // Contact & Company
@@ -20,35 +22,28 @@ export default function CreateProposalPage() {
   const [companyNameInput, setCompanyNameInput] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingCompany, setLoadingCompany] = useState(false);
+  const [companyHQId, setCompanyHQId] = useState('');
 
-  // Proposal
-  const [proposalTitle, setProposalTitle] = useState('');
-  const [purpose, setPurpose] = useState('');
+  // Previous Proposals Modal
+  const [showProposalsModal, setShowProposalsModal] = useState(false);
+  const [previousProposals, setPreviousProposals] = useState([]);
+  const [loadingProposals, setLoadingProposals] = useState(false);
 
-  // Services
-  const [savedServices, setSavedServices] = useState([]);
-  const [selectedServices, setSelectedServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(false);
-
-  // Phases
-  const [phases, setPhases] = useState([]);
-
-  // Compensation
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [paymentStructure, setPaymentStructure] = useState('');
-
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    const hqId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') || '';
+    setCompanyHQId(hqId);
+    
     if (!registry.hydrated) {
       registry.loadFromCache();
     }
-    if (companyHQId) {
-      loadServices();
+    if (hqId) {
+      fetchContacts();
     }
-  }, [companyHQId]);
+  }, []);
 
   const fetchContacts = useCallback(async () => {
     if (!companyHQId) return;
@@ -65,20 +60,6 @@ export default function CreateProposalPage() {
       setLoadingContacts(false);
     }
   }, [companyHQId, registry]);
-
-  const loadServices = async () => {
-    if (!companyHQId) return;
-    setLoadingServices(true);
-    try {
-      const response = await api.get(`/api/products?companyHQId=${companyHQId}`);
-      setSavedServices(response.data || []);
-    } catch (err) {
-      console.error('Error loading services:', err);
-      setSavedServices([]);
-    } finally {
-      setLoadingServices(false);
-    }
-  };
 
   const availableContacts = useMemo(() => {
     if (typeof window === 'undefined') return [];
@@ -130,187 +111,127 @@ export default function CreateProposalPage() {
     }
   };
 
-  const handleAddService = (service) => {
-    const existing = selectedServices.find(s => s.serviceId === service.id);
-    if (existing) {
-      setSelectedServices(selectedServices.map(s =>
-        s.serviceId === service.id
-          ? { ...s, quantity: s.quantity + 1, price: s.unitPrice * (s.quantity + 1) }
-          : s
-      ));
-    } else {
-      const unitPrice = service.price || 0;
-      setSelectedServices([
-        ...selectedServices,
-        {
-          serviceId: service.id,
-          name: service.name,
-          description: service.description || '',
-          unitPrice: unitPrice,
-          quantity: 1,
-          price: unitPrice,
-        }
-      ]);
-    }
-    // Update total price
-    const newTotal = selectedServices.reduce((sum, s) => {
-      if (s.serviceId === service.id) {
-        return sum + (s.unitPrice * (s.quantity + 1));
-      }
-      return sum + s.price;
-    }, service.price || 0);
-    setTotalPrice(newTotal);
-  };
-
-  const handleUpdateServiceQuantity = (serviceId, quantity) => {
-    const newQuantity = Math.max(1, quantity);
-    setSelectedServices(selectedServices.map(s => {
-      if (s.serviceId === serviceId) {
-        return { ...s, quantity: newQuantity, price: s.unitPrice * newQuantity };
-      }
-      return s;
-    }));
-    // Recalculate total
-    const newTotal = selectedServices.reduce((sum, s) => {
-      if (s.serviceId === serviceId) {
-        return sum + (s.unitPrice * newQuantity);
-      }
-      return sum + s.price;
-    }, 0);
-    setTotalPrice(newTotal);
-  };
-
-  const handleRemoveService = (serviceId) => {
-    const removed = selectedServices.find(s => s.serviceId === serviceId);
-    setSelectedServices(selectedServices.filter(s => s.serviceId !== serviceId));
-    setTotalPrice(totalPrice - (removed?.price || 0));
-  };
-
-  const handleAddPhase = () => {
-    setPhases([
-      ...phases,
-      {
-        phaseId: `phase-${Date.now()}`,
-        name: '',
-        weeks: '',
-        color: phases.length === 0 ? 'red' : phases.length === 1 ? 'yellow' : 'purple',
-        goal: '',
-        deliverables: [],
-        coreWork: [],
-        outcome: '',
-      }
-    ]);
-  };
-
-  const handleUpdatePhase = (phaseId, updates) => {
-    setPhases(phases.map(p => p.phaseId === phaseId ? { ...p, ...updates } : p));
-  };
-
-  const handleAddDeliverable = (phaseId) => {
-    setPhases(phases.map(p => {
-      if (p.phaseId === phaseId) {
-        const newDeliverable = {
-          deliverableId: `deliverable-${Date.now()}`,
-          title: '',
-          description: '',
-          category: '',
-          type: '',
-          status: 'pending'
-        };
-        return { ...p, deliverables: [...(p.deliverables || []), newDeliverable] };
-      }
-      return p;
-    }));
-  };
-
-  const handleUpdateDeliverable = (phaseId, deliverableId, field, value) => {
-    setPhases(phases.map(p => {
-      if (p.phaseId === phaseId) {
-        const deliverables = (p.deliverables || []).map(d => 
-          d.deliverableId === deliverableId ? { ...d, [field]: value } : d
-        );
-        return { ...p, deliverables };
-      }
-      return p;
-    }));
-  };
-
-  const handleAddCoreWork = (phaseId) => {
-    setPhases(phases.map(p => {
-      if (p.phaseId === phaseId) {
-        return { ...p, coreWork: [...(p.coreWork || []), ''] };
-      }
-      return p;
-    }));
-  };
-
-  const handleUpdateCoreWork = (phaseId, index, value) => {
-    setPhases(phases.map(p => {
-      if (p.phaseId === phaseId) {
-        const coreWork = [...(p.coreWork || [])];
-        coreWork[index] = value;
-        return { ...p, coreWork };
-      }
-      return p;
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!proposalTitle.trim()) {
-      setError('Proposal title is required');
-      return;
-    }
-    if (!selectedContact || !selectedCompany) {
-      setError('Please select a contact and company');
-      return;
-    }
-
-    setSubmitting(true);
-    setError('');
-
+  const loadPreviousProposals = async () => {
+    if (!companyHQId) return;
+    setLoadingProposals(true);
     try {
-      // Removed serviceInstances - deliverables are in phases now
-      const compensation = {
-        total: totalPrice,
-        currency: 'USD',
-        paymentStructure: paymentStructure || `$${totalPrice.toLocaleString()}`,
-      };
-
-      const payload = {
-        companyHQId,
-        clientName: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim() || selectedContact.email,
-        clientCompany: selectedCompany.companyName,
-        companyId: selectedCompany.id,
-        purpose: purpose || proposalTitle,
-        status: 'draft',
-        phases: phases.length > 0 ? phases : null,
-        milestones: [],
-        compensation,
-        totalPrice,
-      };
-
-      const response = await api.post('/api/proposals', payload);
-      const proposal = response.data?.proposal;
-
-      if (!proposal) {
-        throw new Error('Failed to create proposal');
+      const response = await api.get(`/api/proposals?companyHQId=${companyHQId}`);
+      if (response.data?.success && response.data.proposals) {
+        setPreviousProposals(response.data.proposals || []);
       }
-
-      addProposal(proposal);
-      router.push(`/client-operations/proposals/${proposal.id}`);
     } catch (err) {
-      console.error('Error creating proposal:', err);
-      setError(err.response?.data?.error || 'Failed to create proposal');
+      console.error('Error loading proposals:', err);
     } finally {
-      setSubmitting(false);
+      setLoadingProposals(false);
     }
   };
+
+  const handleOptionSelect = async (option) => {
+    if (!selectedContact || !selectedCompany) {
+      setError('Please select a contact and company first');
+      return;
+    }
+
+    const contactId = selectedContact.id;
+    const companyId = selectedCompany.id;
+
+    switch (option) {
+      case 'csv': {
+        router.push(`/client-operations/proposals/create/csv?contactId=${contactId}&companyId=${companyId}`);
+        break;
+      }
+      case 'templates': {
+        router.push(`/workpackages/assemble/templates?contactId=${contactId}`);
+        break;
+      }
+      case 'previous': {
+        await loadPreviousProposals();
+        setShowProposalsModal(true);
+        break;
+      }
+      case 'blank': {
+        router.push(`/client-operations/proposals/create/blank?contactId=${contactId}&companyId=${companyId}`);
+        break;
+      }
+    }
+  };
+
+  const handleCloneProposal = async (proposalId) => {
+    if (!selectedContact || !selectedCompany) return;
+    
+    try {
+      setLoadingProposals(true);
+      const response = await api.post('/api/proposals/assemble', {
+        contactId: selectedContact.id,
+        companyHQId,
+        companyId: selectedCompany.id,
+        title: 'Copy of Proposal',
+        estimatedStart: new Date().toISOString(),
+        assemblyType: 'clone',
+        data: {
+          sourceProposalId: proposalId,
+        },
+      });
+
+      if (response.data?.success) {
+        const proposal = response.data.proposal;
+        
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem('proposals');
+          const existing = cached ? JSON.parse(cached) : [];
+          const updated = [...existing, proposal];
+          window.localStorage.setItem('proposals', JSON.stringify(updated));
+        }
+        
+        router.push(`/client-operations/proposals/${proposal.id}`);
+      }
+    } catch (err) {
+      console.error('Error cloning proposal:', err);
+      setError('Failed to clone proposal');
+    } finally {
+      setLoadingProposals(false);
+      setShowProposalsModal(false);
+    }
+  };
+
+  const OPTIONS = [
+    {
+      id: 'csv',
+      title: 'Upload From CSV',
+      description: 'Upload a CSV containing phases and deliverables. IgniteBD will auto-generate the proposal.',
+      icon: Upload,
+      buttonText: 'Upload CSV',
+    },
+    {
+      id: 'templates',
+      title: 'Use Company Templates',
+      description: 'Load the default phases and deliverables defined for this company.',
+      icon: FileText,
+      buttonText: 'Start From Templates',
+    },
+    {
+      id: 'previous',
+      title: 'Use a Previous Proposal',
+      description: 'Copy an existing proposal as your starting point.',
+      icon: Copy,
+      buttonText: 'Copy Existing Proposal',
+    },
+    {
+      id: 'blank',
+      title: 'Start Blank',
+      description: 'Create a proposal from scratch.',
+      icon: Plus,
+      buttonText: 'Build From Scratch',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Create Proposal"
+          subtitle="Choose how you'd like to build your proposal"
           backTo="/client-operations/proposals"
           backLabel="Back to Proposals"
         />
@@ -322,7 +243,7 @@ export default function CreateProposalPage() {
         )}
 
         <div className="mt-8 space-y-6">
-          {/* Contact & Company */}
+          {/* Contact & Company Selection */}
           <section className="rounded-2xl bg-white p-6 shadow">
             <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <User className="h-5 w-5 text-red-600" />
@@ -335,7 +256,7 @@ export default function CreateProposalPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <User className="h-5 w-5 text-green-600" />
+                      <CheckCircle className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">
@@ -363,445 +284,224 @@ export default function CreateProposalPage() {
             )}
 
             {/* Contact Search */}
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search contacts by name, email, or company..."
-                    value={contactSearch}
-                    onChange={(e) => setContactSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  />
-                </div>
-                <button
-                  onClick={() => registry.loadFromCache()}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </button>
-                {companyHQId && (
+            {(!selectedContact || !selectedCompany) && (
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search contacts by name, email, or company..."
+                      value={contactSearch}
+                      onChange={(e) => setContactSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    />
+                  </div>
                   <button
-                    onClick={fetchContacts}
-                    disabled={loadingContacts}
-                    className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 text-blue-600"
+                    onClick={() => registry.loadFromCache()}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    title="Refresh from cache"
                   >
-                    <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
+                    <RefreshCw className="h-4 w-4" />
                   </button>
+                  {companyHQId && (
+                    <button
+                      onClick={fetchContacts}
+                      disabled={loadingContacts}
+                      className="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 text-blue-600"
+                      title="Fetch from API"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${loadingContacts ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Contact List */}
+                {availableContacts.length > 0 && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {availableContacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() => handleContactSelect(contact)}
+                        className={`w-full text-left p-4 rounded-lg border-2 transition ${
+                          selectedContact?.id === contact.id
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                            <User className="h-5 w-5 text-red-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {contact.firstName} {contact.lastName}
+                            </p>
+                            {contact.email && (
+                              <p className="text-sm text-gray-600">{contact.email}</p>
+                            )}
+                            {contact.contactCompany?.companyName && (
+                              <p className="text-xs text-gray-500">{contact.contactCompany.companyName}</p>
+                            )}
+                          </div>
+                          {selectedContact?.id === contact.id && (
+                            <CheckCircle className="h-5 w-5 text-red-600 ml-auto" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Company Confirmation */}
+                {selectedContact && !selectedCompany && (
+                  <div className="pt-4 border-t">
+                    <p className="mb-2 text-sm text-gray-600">Confirm company name:</p>
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={companyNameInput}
+                        onChange={(e) => setCompanyNameInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && companyNameInput.trim()) {
+                            handleCompanyConfirm();
+                          }
+                        }}
+                        placeholder="Company name"
+                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                        disabled={loadingCompany}
+                      />
+                      <button
+                        onClick={handleCompanyConfirm}
+                        disabled={loadingCompany || !companyNameInput.trim()}
+                        className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {loadingCompany ? 'Confirming...' : 'Confirm'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
+          </section>
 
-              {/* Contact List */}
-              {availableContacts.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {availableContacts.map((contact) => (
-                    <button
-                      key={contact.id}
-                      onClick={() => handleContactSelect(contact)}
-                      className="w-full text-left p-4 rounded-lg border-2 border-gray-200 hover:border-red-300 hover:bg-red-50 transition"
+          {/* Proposal Creation Options */}
+          {selectedContact && selectedCompany && (
+            <section className="rounded-2xl bg-white p-6 shadow">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">
+                Choose Your Starting Point
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <div
+                      key={option.id}
+                      className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+                      onClick={() => handleOptionSelect(option.id)}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                          <User className="h-5 w-5 text-red-600" />
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                          <Icon className="h-6 w-6 text-red-600" />
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {contact.firstName} {contact.lastName}
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            {option.title}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {option.description}
                           </p>
-                          {contact.email && (
-                            <p className="text-sm text-gray-600">{contact.email}</p>
-                          )}
-                          {contact.contactCompany?.companyName && (
-                            <p className="text-xs text-gray-500">{contact.contactCompany.companyName}</p>
-                          )}
                         </div>
+                      </div>
+                      <button
+                        className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        {option.buttonText}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+
+      {/* Previous Proposals Modal */}
+      {showProposalsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">Select a Proposal to Copy</h3>
+              <button
+                onClick={() => setShowProposalsModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingProposals ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-600">Loading proposals...</p>
+                </div>
+              ) : previousProposals.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm text-gray-600">No previous proposals found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {previousProposals.map((proposal) => (
+                    <button
+                      key={proposal.id}
+                      onClick={() => handleCloneProposal(proposal.id)}
+                      className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-red-300 hover:bg-red-50 transition"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{proposal.title}</h4>
+                          {proposal.purpose && (
+                            <p className="text-sm text-gray-600 mt-1">{proposal.purpose}</p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className="text-xs text-gray-500">
+                              {proposal.contact?.firstName} {proposal.contact?.lastName}
+                            </span>
+                            {proposal.totalPrice && (
+                              <span className="text-xs font-semibold text-gray-900">
+                                ${proposal.totalPrice.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Copy className="h-5 w-5 text-gray-400" />
                       </div>
                     </button>
                   ))}
                 </div>
               )}
-
-              {/* Company Confirmation */}
-              {selectedContact && !selectedCompany && (
-                <div className="pt-4 border-t">
-                  <p className="mb-2 text-sm text-gray-600">Confirm company name:</p>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={companyNameInput}
-                      onChange={(e) => setCompanyNameInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && companyNameInput.trim()) {
-                          handleCompanyConfirm();
-                        }
-                      }}
-                      placeholder="Company name"
-                      className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                      disabled={loadingCompany}
-                    />
-                    <button
-                      onClick={handleCompanyConfirm}
-                      disabled={loadingCompany || !companyNameInput.trim()}
-                      className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {loadingCompany ? 'Confirming...' : 'Confirm'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Proposal Title & Purpose */}
-          <section className="rounded-2xl bg-white p-6 shadow">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-red-600" />
-              Proposal Title & Purpose
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Proposal Title *
-                </label>
-                <input
-                  type="text"
-                  value={proposalTitle}
-                  onChange={(e) => setProposalTitle(e.target.value)}
-                  placeholder="e.g., Proposal for Growth Services for BusinessPoint Law"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Purpose / Description
-                </label>
-                <textarea
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  rows={6}
-                  placeholder="Describe the purpose and goals of this proposal..."
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Services */}
-          <section className="rounded-2xl bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Package className="h-5 w-5 text-red-600" />
-                Services
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => router.push('/products/builder')}
-                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Product
-                </button>
-                <button
-                  onClick={loadServices}
-                  disabled={loadingServices}
-                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loadingServices ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            {savedServices.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm text-gray-600 mb-4">No services available</p>
-                <button
-                  onClick={() => router.push('/products/builder')}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                >
-                  Create Your First Product
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {savedServices.map((service) => {
-                  const selected = selectedServices.find(s => s.serviceId === service.id);
-                  return (
-                    <div
-                      key={service.id}
-                      className={`rounded-lg border p-4 ${
-                        selected
-                          ? 'border-red-500 bg-red-50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900">{service.name}</h3>
-                          {service.description && (
-                            <p className="text-sm text-gray-600 mt-1">{service.description}</p>
-                          )}
-                          <p className="text-sm font-semibold text-gray-900 mt-2">
-                            ${(service.price || 0).toLocaleString()} per unit
-                          </p>
-                        </div>
-                        {selected ? (
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity - 1)}
-                                className="rounded border border-gray-300 px-2 py-1 text-sm"
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                value={selected.quantity}
-                                onChange={(e) => handleUpdateServiceQuantity(service.id, parseInt(e.target.value) || 1)}
-                                className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
-                                min="1"
-                              />
-                              <button
-                                onClick={() => handleUpdateServiceQuantity(service.id, selected.quantity + 1)}
-                                className="rounded border border-gray-300 px-2 py-1 text-sm"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <p className="text-sm font-semibold text-gray-900">
-                              ${selected.price.toLocaleString()}
-                            </p>
-                            <button
-                              onClick={() => handleRemoveService(service.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleAddService(service)}
-                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                          >
-                            Add
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Phases */}
-          <section className="rounded-2xl bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-red-600" />
-                Phases
-              </h2>
-              <button
-                onClick={handleAddPhase}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
-              >
-                <Plus className="h-4 w-4" />
-                Add Phase
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {phases.map((phase, index) => {
-                const colorClasses = {
-                  red: 'border-red-200 bg-red-50',
-                  yellow: 'border-yellow-200 bg-yellow-50',
-                  purple: 'border-purple-200 bg-purple-50',
-                };
-                return (
-                  <div
-                    key={phase.phaseId}
-                    className={`rounded-lg border p-6 ${colorClasses[phase.color] || colorClasses.red}`}
-                  >
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">Phase {index + 1}</h3>
-                      <button
-                        onClick={() => setPhases(phases.filter(p => p.phaseId !== phase.phaseId))}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-700">Phase Name</label>
-                          <input
-                            type="text"
-                            value={phase.name}
-                            onChange={(e) => handleUpdatePhase(phase.phaseId, { name: e.target.value })}
-                            placeholder="e.g., Foundation"
-                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-700">Weeks</label>
-                          <input
-                            type="text"
-                            value={phase.weeks}
-                            onChange={(e) => handleUpdatePhase(phase.phaseId, { weeks: e.target.value })}
-                            placeholder="e.g., 1-3"
-                            className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-semibold text-gray-700">Goal</label>
-                        <textarea
-                          value={phase.goal}
-                          onChange={(e) => handleUpdatePhase(phase.phaseId, { goal: e.target.value })}
-                          placeholder="Phase goal..."
-                          rows={2}
-                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="mb-2 flex items-center justify-between">
-                          <label className="block text-xs font-semibold text-gray-700">Deliverables</label>
-                          <button
-                            onClick={() => handleAddDeliverable(phase.phaseId)}
-                            className="text-xs text-red-600 hover:text-red-700"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          {(phase.deliverables || []).map((deliverable) => {
-                            // Handle both old format (string) and new format (object)
-                            const isString = typeof deliverable === 'string';
-                            const deliverableId = isString ? `deliverable-${Date.now()}-${Math.random()}` : deliverable.deliverableId;
-                            const title = isString ? deliverable : (deliverable.title || '');
-                            
-                            return (
-                              <input
-                                key={deliverableId}
-                                type="text"
-                                value={title}
-                                onChange={(e) => handleUpdateDeliverable(phase.phaseId, deliverableId, 'title', e.target.value)}
-                                placeholder="e.g., 3 Target Personas"
-                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="mb-2 flex items-center justify-between">
-                          <label className="block text-xs font-semibold text-gray-700">Core Work</label>
-                          <button
-                            onClick={() => handleAddCoreWork(phase.phaseId)}
-                            className="text-xs text-red-600 hover:text-red-700"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          {(phase.coreWork || []).map((work, workIndex) => (
-                            <input
-                              key={workIndex}
-                              type="text"
-                              value={work}
-                              onChange={(e) => handleUpdateCoreWork(phase.phaseId, workIndex, e.target.value)}
-                              placeholder="e.g., Configure IgniteBD CRM + domain layer"
-                              className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-semibold text-gray-700">Outcome</label>
-                        <textarea
-                          value={phase.outcome}
-                          onChange={(e) => handleUpdatePhase(phase.phaseId, { outcome: e.target.value })}
-                          placeholder="Expected outcome..."
-                          rows={2}
-                          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Compensation */}
-          <section className="rounded-2xl bg-white p-6 shadow">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-red-600" />
-              Compensation
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Total Price *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                  <input
-                    type="number"
-                    value={totalPrice || ''}
-                    onChange={(e) => setTotalPrice(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                    step="0.01"
-                    min="0"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Payment Structure
-                </label>
-                <input
-                  type="text"
-                  value={paymentStructure}
-                  onChange={(e) => setPaymentStructure(e.target.value)}
-                  placeholder="e.g., 3 payments of $500 at beginning, middle, and on delivery"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Submit */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-2xl shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Proposal Value</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${totalPrice.toLocaleString()}
-                </p>
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || !proposalTitle.trim() || !selectedContact || !selectedCompany}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {submitting ? 'Creating...' : 'Create Proposal'}
-              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
+export default function ProposalStartPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ProposalStartContent />
+    </Suspense>
+  );
+}
