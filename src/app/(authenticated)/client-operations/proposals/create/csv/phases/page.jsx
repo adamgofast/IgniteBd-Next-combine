@@ -134,7 +134,7 @@ function PhaseCSVUploadContent() {
           }));
           
           // Redirect to Client Operations Templates with phase tab
-          router.push('/templates/pantry?tab=phases');
+          router.push('/templates/library?tab=phases');
         }
       } else {
         setError(uploadResponse.data?.error || 'Failed to upload CSV');

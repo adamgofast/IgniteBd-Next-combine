@@ -94,7 +94,7 @@ function PhaseCSVPreviewContent() {
       });
 
       if (uploadResponse.data?.success) {
-        router.push(`/templates/pantry?uploaded=${uploadResponse.data.count}`);
+        router.push(`/templates/library?uploaded=${uploadResponse.data.count}`);
       } else {
         setError(uploadResponse.data?.error || 'Failed to upload CSV');
       }

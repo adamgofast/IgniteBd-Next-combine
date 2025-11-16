@@ -7,9 +7,9 @@ import api from '@/lib/api';
 
 /**
  * Client Operations Templates Page
- * Manage Phase Templates and Deliverable Templates
+ * Manage Phase Templates, Deliverable Templates, and (soon) Proposal Templates
  */
-function TemplatePantryContent() {
+function TemplateLibraryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phaseTemplates, setPhaseTemplates] = useState([]);
@@ -18,48 +18,76 @@ function TemplatePantryContent() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
-  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables'
+  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals'
 
+  // Load from localStorage first - no auto-fetch
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     // Read tab from query params
     const tab = searchParams.get('tab');
-    if (tab === 'phases' || tab === 'deliverables') {
+    if (tab === 'phases' || tab === 'deliverables' || tab === 'proposals') {
       setActiveTab(tab);
     }
 
     // Check for success message from CSV import
-    if (typeof window !== 'undefined') {
-      const successData = sessionStorage.getItem('csvImportSuccess');
-      if (successData) {
-        try {
-          const data = JSON.parse(successData);
-          setSuccessMessage(data);
-          sessionStorage.removeItem('csvImportSuccess');
-          
-          // Auto-dismiss after 5 seconds
-          setTimeout(() => {
-            setSuccessMessage(null);
-          }, 5000);
-        } catch (e) {
-          console.error('Error parsing success data:', e);
-        }
+    const successData = sessionStorage.getItem('csvImportSuccess');
+    if (successData) {
+      try {
+        const data = JSON.parse(successData);
+        setSuccessMessage(data);
+        sessionStorage.removeItem('csvImportSuccess');
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 5000);
+      } catch (e) {
+        console.error('Error parsing success data:', e);
       }
     }
 
-    loadTemplates();
+    // Load from localStorage first
+    const cachedPhaseTemplates = localStorage.getItem('phaseTemplates');
+    if (cachedPhaseTemplates) {
+      try {
+        const parsed = JSON.parse(cachedPhaseTemplates);
+        if (Array.isArray(parsed)) {
+          setPhaseTemplates(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached phase templates', error);
+      }
+    }
+
+    const cachedDeliverableTemplates = localStorage.getItem('deliverableTemplates');
+    if (cachedDeliverableTemplates) {
+      try {
+        const parsed = JSON.parse(cachedDeliverableTemplates);
+        if (Array.isArray(parsed)) {
+          setDeliverableTemplates(parsed);
+        }
+      } catch (error) {
+        console.warn('Failed to parse cached deliverable templates', error);
+      }
+    }
+
+    setLoading(false);
   }, [searchParams]);
 
+  // Fetch templates from API (optional, can be called manually)
   const loadTemplates = async () => {
+    if (typeof window === 'undefined') return;
+    
     try {
       setLoading(true);
       
       // Get companyHQId from localStorage
-      const companyHQId = typeof window !== 'undefined' 
-        ? window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId') 
-        : null;
+      const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
       
       if (!companyHQId) {
         setError('CompanyHQ ID not found');
+        setLoading(false);
         return;
       }
       
@@ -69,10 +97,14 @@ function TemplatePantryContent() {
       ]);
 
       if (phasesRes.data?.success) {
-        setPhaseTemplates(phasesRes.data.phaseTemplates || []);
+        const phases = phasesRes.data.phaseTemplates || [];
+        setPhaseTemplates(phases);
+        localStorage.setItem('phaseTemplates', JSON.stringify(phases));
       }
       if (deliverablesRes.data?.success) {
-        setDeliverableTemplates(deliverablesRes.data.deliverableTemplates || []);
+        const deliverables = deliverablesRes.data.deliverableTemplates || [];
+        setDeliverableTemplates(deliverables);
+        localStorage.setItem('deliverableTemplates', JSON.stringify(deliverables));
       }
     } catch (err) {
       console.error('Error loading templates:', err);
@@ -111,6 +143,7 @@ function TemplatePantryContent() {
       });
 
       if (response.data?.success) {
+        // Update localStorage with new templates
         await loadTemplates();
         alert(`Imported ${response.data.count} phase templates`);
       } else {
@@ -154,6 +187,7 @@ function TemplatePantryContent() {
       });
 
       if (response.data?.success) {
+        // Update localStorage with new templates
         await loadTemplates();
         alert(`Imported ${response.data.count} deliverable templates`);
       } else {
@@ -244,6 +278,16 @@ function TemplatePantryContent() {
             >
               Deliverable Templates ({deliverableTemplates.length})
             </button>
+            <button
+              onClick={() => setActiveTab('proposals')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'proposals'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Proposal Templates (coming soon)
+            </button>
           </nav>
         </div>
 
@@ -252,17 +296,13 @@ function TemplatePantryContent() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Phase Templates</h2>
-              <label className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 cursor-pointer">
+              <a
+                href="/client-operations/proposals/create/csv/phases"
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              >
                 <Upload className="h-4 w-4" />
-                <span>Import CSV</span>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handlePhaseCSVUpload}
-                  disabled={uploading}
-                  className="hidden"
-                />
-              </label>
+                <span>Upload CSV</span>
+              </a>
             </div>
 
             <div className="rounded-lg border border-gray-200 bg-white shadow">
@@ -292,7 +332,7 @@ function TemplatePantryContent() {
                   {phaseTemplates.length === 0 && (
                     <tr>
                       <td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">
-                        No phase templates. Import a CSV to get started.
+                        No phase templates. <a href="/client-operations/proposals/create/csv/phases" className="text-red-600 hover:text-red-700">Upload a CSV</a> to get started.
                       </td>
                     </tr>
                   )}
@@ -307,17 +347,13 @@ function TemplatePantryContent() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Deliverable Templates</h2>
-              <label className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 cursor-pointer">
+              <a
+                href="/client-operations/proposals/create/csv/deliverables"
+                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+              >
                 <Upload className="h-4 w-4" />
-                <span>Import CSV</span>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleDeliverableCSVUpload}
-                  disabled={uploading}
-                  className="hidden"
-                />
-              </label>
+                <span>Upload CSV</span>
+              </a>
             </div>
 
             <div className="rounded-lg border border-gray-200 bg-white shadow">
@@ -357,7 +393,7 @@ function TemplatePantryContent() {
                   {deliverableTemplates.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-500">
-                        No deliverable templates. Import a CSV to get started.
+                        No deliverable templates. <a href="/client-operations/proposals/create/csv/deliverables" className="text-red-600 hover:text-red-700">Upload a CSV</a> to get started.
                       </td>
                     </tr>
                   )}
@@ -366,12 +402,36 @@ function TemplatePantryContent() {
             </div>
           </div>
         )}
+
+        {/* Proposal Templates (stub for future build) */}
+        {activeTab === 'proposals' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Proposal Templates</h2>
+            </div>
+
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Proposal templates are coming next
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                You&apos;ll be able to bundle phase and deliverable templates into reusable proposal
+                packages (e.g., &quot;Starter Package&quot;), then start new proposals from those
+                templates in one click.
+              </p>
+              <p className="text-xs text-gray-500">
+                For now, manage your Phase and Deliverable templates above. Proposal templates will
+                use these building blocks.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default function TemplatePantryPage() {
+export default function TemplateLibraryPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 py-8">
@@ -380,7 +440,7 @@ export default function TemplatePantryPage() {
         </div>
       </div>
     }>
-      <TemplatePantryContent />
+      <TemplateLibraryContent />
     </Suspense>
   );
 }

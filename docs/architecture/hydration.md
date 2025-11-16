@@ -395,3 +395,4 @@ const companyHQId = localStorage.getItem('companyHQId');
 **Architecture**: ownerId → companyHQId → Everything  
 **Principle**: Maximize localStorage, surgical hydration points
 
+

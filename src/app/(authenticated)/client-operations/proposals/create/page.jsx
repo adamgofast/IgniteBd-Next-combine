@@ -55,7 +55,7 @@ function ProposalStartContent() {
       }
       case 'templates': {
         // Route to template pantry first to manage/upload templates
-        router.push('/templates/pantry');
+        router.push('/templates/library');
         break;
       }
       case 'previous': {

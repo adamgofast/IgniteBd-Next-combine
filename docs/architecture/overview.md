@@ -466,3 +466,4 @@ import Link from 'next/link';
 **Authentication**: Firebase Auth  
 **Deployment**: Vercel (Full-Stack)
 
+

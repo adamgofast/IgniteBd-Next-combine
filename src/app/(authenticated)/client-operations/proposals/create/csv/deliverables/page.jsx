@@ -134,7 +134,7 @@ function DeliverableCSVUploadContent() {
           }));
           
           // Redirect to Client Operations Templates with deliverable tab
-          router.push('/templates/pantry?tab=deliverables');
+          router.push('/templates/library?tab=deliverables');
         }
       } else {
         setError(uploadResponse.data?.error || 'Failed to upload CSV');

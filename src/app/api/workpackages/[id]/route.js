@@ -42,7 +42,7 @@ export async function GET(request, { params }) {
             items: {
               include: {
                 collateral: true,
-              },
+          },
             },
           },
           orderBy: { position: 'asc' },
@@ -124,7 +124,7 @@ export async function PATCH(request, { params }) {
             items: {
               include: {
                 collateral: true,
-              },
+          },
             },
           },
           orderBy: { position: 'asc' },
