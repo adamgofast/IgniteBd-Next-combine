@@ -13,11 +13,14 @@ function PhaseCSVUploadContent() {
   const router = useRouter();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [uploadedCount, setUploadedCount] = useState(0);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
@@ -27,7 +30,66 @@ function PhaseCSVUploadContent() {
       setFile(selectedFile);
       setError('');
       setSuccess(false);
+      setShowPreview(false);
+      setPreviewData(null);
+      
+      // Auto-preview the file
+      await handlePreview(selectedFile);
     }
+  };
+
+  const handlePreview = async (fileToPreview) => {
+    if (!fileToPreview) return;
+    
+    if (typeof window === 'undefined') return;
+
+    const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+    if (!companyHQId) {
+      setError('CompanyHQ ID not found');
+      return;
+    }
+
+    setPreviewing(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileToPreview);
+      formData.append('uploadType', 'phase');
+
+      const previewResponse = await api.post('/api/csv/preview', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (previewResponse.data?.success) {
+        setPreviewData(previewResponse.data);
+        setShowPreview(true);
+      } else {
+        setError(previewResponse.data?.error || 'Failed to preview CSV');
+      }
+    } catch (err) {
+      console.error('Error previewing CSV:', err);
+      setError(err.response?.data?.error || 'Failed to preview CSV');
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = `Phase Name,Description,Duration (Days),Order
+Foundation,Initial setup and configuration,5,1
+Enrichment,Data import and enrichment,10,2
+Launch,Final preparation and go-live,7,3`;
+    
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'phase_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const handleUpload = async () => {
@@ -104,13 +166,22 @@ function PhaseCSVUploadContent() {
         <div className="mt-8 rounded-2xl bg-white p-6 shadow">
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">CSV Format</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">CSV Format</h2>
+                <button
+                  onClick={downloadTemplate}
+                  className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                >
+                  <FileText className="h-4 w-4" />
+                  Download Template
+                </button>
+              </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p className="text-sm text-gray-600 mb-3">Your CSV should include the following columns:</p>
                 <div className="space-y-2">
                   <div className="flex items-start gap-2">
                     <span className="font-semibold text-gray-900 text-sm">Phase Name</span>
-                    <span className="text-xs text-gray-500">(required)</span>
+                    <span className="text-xs text-gray-500">(recommended)</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="font-semibold text-gray-900 text-sm">Description</span>
@@ -122,7 +193,7 @@ function PhaseCSVUploadContent() {
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="font-semibold text-gray-900 text-sm">Order</span>
-                    <span className="text-xs text-gray-500">(required: 1, 2, 3...)</span>
+                    <span className="text-xs text-gray-500">(optional: 1, 2, 3...)</span>
                   </div>
                 </div>
                 <div className="mt-4 p-3 bg-white rounded border border-gray-200">
@@ -168,13 +239,90 @@ Launch,Final preparation and go-live,7,3`}
               </div>
             </div>
 
-            <button
-              onClick={handleUpload}
-              disabled={!file || uploading}
-              className="w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploading ? 'Uploading...' : 'Upload Phase CSV'}
-            </button>
+            {/* Preview Section */}
+            {showPreview && previewData && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Field Mapping Preview</h3>
+                <div className="space-y-2 mb-4">
+                  {previewData.fieldMappings.map((mapping, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{mapping.csvHeader}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">→</span>
+                        <span className={`font-medium ${
+                          mapping.mappedField === 'unmapped' 
+                            ? 'text-orange-600' 
+                            : mapping.isRequired 
+                              ? 'text-red-600' 
+                              : 'text-green-600'
+                        }`}>
+                          {mapping.mappedField === 'unmapped' ? 'Unmapped' : mapping.mappedField}
+                        </span>
+                        {mapping.isRequired && (
+                          <span className="text-xs text-red-600">(recommended)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {previewData.warnings && previewData.warnings.length > 0 && (
+                  <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-xs font-semibold text-yellow-800 mb-1">Warnings:</p>
+                    <ul className="text-xs text-yellow-700 list-disc list-inside">
+                      {previewData.warnings.map((warning, idx) => (
+                        <li key={idx}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {previewData.sampleData && previewData.sampleData.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Sample Data (first {previewData.sampleData.length} rows):</p>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs border border-gray-200">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            {previewData.headers.map((header, idx) => (
+                              <th key={idx} className="px-2 py-1 text-left border-b">{header}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewData.sampleData.map((row, rowIdx) => (
+                            <tr key={rowIdx}>
+                              {previewData.headers.map((header, colIdx) => (
+                                <td key={colIdx} className="px-2 py-1 border-b">{row[header] || ''}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              {file && !showPreview && (
+                <button
+                  onClick={() => handlePreview(file)}
+                  disabled={previewing}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {previewing ? 'Previewing...' : 'Preview Mapping'}
+                </button>
+              )}
+              <button
+                onClick={handleUpload}
+                disabled={!file || uploading}
+                className={`${showPreview ? 'w-full' : 'flex-1'} rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {uploading ? 'Uploading...' : 'Upload Phase CSV'}
+              </button>
+            </div>
 
             {success && (
               <button

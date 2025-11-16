@@ -1,7 +1,15 @@
 /**
  * CSV Mapper Services
  * Convert plain-English CSV fields to internal schema fields
+ * Uses Universal Field Mapper Service for field detection
  */
+
+import { 
+  mapCsvHeadersToFields, 
+  mapCsvRecordToDatabase, 
+  validateMappedData,
+  getFieldMappingSuggestions 
+} from './universalCsvFieldMapper.js';
 
 /**
  * Map Phase CSV rows to PhaseTemplate objects
@@ -10,25 +18,35 @@
  * @returns {Array} Array of PhaseTemplate objects ready for upsert
  */
 export function mapPhaseCsvToPhaseTemplates(rows, companyHQId) {
+  if (!rows || rows.length === 0) return [];
+  
+  // Get headers from first row
+  const headers = Object.keys(rows[0]);
+  const fieldMappings = mapCsvHeadersToFields(headers, 'phase');
+  
   return rows.map((row, index) => {
-    // Map plain-English fields to schema fields
-    const phaseName = row['Phase Name'] || row['phase name'] || row.phaseName || `Phase ${index + 1}`;
-    const description = row['Description'] || row.description || null;
-    const durationDays = row['Duration (Days)'] || row['duration (days)'] || row.durationDays || null;
-    const order = parseInt(row['Order'] || row.order || index + 1);
+    // Use universal mapper to map record
+    const mapped = mapCsvRecordToDatabase(row, fieldMappings, 'phase');
+    
+    // Extract values with fallbacks
+    const phaseName = mapped.name || `Phase ${index + 1}`;
+    const description = mapped.description || null;
+    const durationDays = mapped._durationDays || null;
+    const order = mapped._order || index + 1;
 
-    // Validate required fields
-    if (!phaseName || !phaseName.trim()) {
-      throw new Error(`Row ${index + 1}: Phase Name is required`);
+    // Validate (non-blocking - show warning but allow)
+    const validation = validateMappedData(mapped, 'phase');
+    if (!validation.isValid) {
+      console.warn(`Row ${index + 1} validation:`, validation.errors);
     }
 
     return {
       companyHQId,
       name: phaseName.trim(),
       description: description ? description.trim() : null,
-      // Note: PhaseTemplate doesn't have duration field, but we can store it in description if needed
-      // Or we can add it to the schema later
-      _order: order, // Store order for sorting
+      _order: order,
+      _durationDays: durationDays,
+      _validation: validation, // Store validation for preview
     };
   });
 }
@@ -40,51 +58,45 @@ export function mapPhaseCsvToPhaseTemplates(rows, companyHQId) {
  * @returns {Array} Array of DeliverableTemplate objects ready for upsert
  */
 export function mapDeliverableCsvToDeliverableTemplates(rows, companyHQId) {
+  if (!rows || rows.length === 0) return [];
+  
+  // Get headers from first row
+  const headers = Object.keys(rows[0]);
+  const fieldMappings = mapCsvHeadersToFields(headers, 'deliverable');
+  
   return rows.map((row, index) => {
-    // Map plain-English fields to schema fields
+    // Use universal mapper to map record
+    const mapped = mapCsvRecordToDatabase(row, fieldMappings, 'deliverable');
+    
+    // Extract values with fallbacks
     const phaseName = row['Phase Name'] || row['phase name'] || row.phaseName || null;
-    const deliverableName = row['Deliverable Name'] || row['deliverable name'] || row.deliverableName || null;
-    const description = row['Description'] || row.description || null;
-    const quantity = parseInt(row['Quantity'] || row.quantity || '1');
-    const unit = (row['Unit'] || row.unit || 'week').toLowerCase();
-    const duration = parseInt(row['Duration'] || row.duration || '1');
+    const deliverableName = mapped.deliverableLabel || null;
+    const description = mapped.description || null;
+    const quantity = mapped._quantity || 1;
+    const unitOfMeasure = mapped.defaultUnitOfMeasure || 'week';
+    const duration = mapped.defaultDuration || 1;
 
-    // Validate required fields
-    if (!deliverableName || !deliverableName.trim()) {
-      throw new Error(`Row ${index + 1}: Deliverable Name is required`);
+    // Validate (non-blocking - show warning but allow)
+    const validation = validateMappedData(mapped, 'deliverable');
+    if (!validation.isValid) {
+      console.warn(`Row ${index + 1} validation:`, validation.errors);
     }
 
-    // Map unit to internal unitOfMeasure
-    // Plain English: item/day/week -> Internal: day/week/month
-    let unitOfMeasure = 'week'; // default
-    if (unit === 'day' || unit === 'days') {
-      unitOfMeasure = 'day';
-    } else if (unit === 'week' || unit === 'weeks') {
-      unitOfMeasure = 'week';
-    } else if (unit === 'month' || unit === 'months') {
-      unitOfMeasure = 'month';
-    } else if (unit === 'item' || unit === 'items') {
-      // Items are typically per-unit, use week as default
-      unitOfMeasure = 'week';
-    }
-
-    // Map deliverable name to deliverableType
-    // This is a simple mapping - in production you might want a lookup table
-    // For now, we'll use a normalized version of the name
+    // Map deliverable name to deliverableType (normalized)
     const deliverableType = deliverableName
-      .toLowerCase()
-      .replace(/\s+/g, '_')
-      .replace(/[^a-z0-9_]/g, '');
+      ? deliverableName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+      : `deliverable_${index + 1}`;
 
     return {
       companyHQId,
       deliverableType,
-      deliverableLabel: deliverableName.trim(),
+      deliverableLabel: deliverableName ? deliverableName.trim() : `Deliverable ${index + 1}`,
       defaultUnitOfMeasure: unitOfMeasure,
-      defaultDuration: duration || 1,
-      _phaseName: phaseName ? phaseName.trim() : null, // Store for reference, not in schema
-      _description: description ? description.trim() : null, // Store for reference
-      _quantity: quantity, // Store for reference
+      defaultDuration: duration,
+      _phaseName: phaseName ? phaseName.trim() : null,
+      _description: description ? description.trim() : null,
+      _quantity: quantity,
+      _validation: validation, // Store validation for preview
     };
   });
 }
