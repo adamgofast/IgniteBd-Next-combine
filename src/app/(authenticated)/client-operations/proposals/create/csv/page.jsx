@@ -1,78 +1,25 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Upload, FileText, ArrowLeft } from 'lucide-react';
+import { Upload, FileText, ArrowLeft, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
- * CSV Upload Handler for Proposal Creation
+ * CSV Upload Selection Page
+ * Choose between Phase CSV or Deliverable CSV upload
  */
-function CSVUploadContent() {
+function CSVUploadSelectionContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const contactId = searchParams.get('contactId');
-  const companyId = searchParams.get('companyId');
+  const [selectedType, setSelectedType] = useState(null);
 
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
-        setError('Please select a CSV file');
-        return;
-      }
-      setFile(selectedFile);
-      setError('');
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file || !contactId || !companyId) {
-      setError('Please select a CSV file and ensure contact/company are selected');
-      return;
-    }
-
-    if (typeof window === 'undefined') return;
-
-    const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
-    if (!companyHQId) {
-      setError('CompanyHQ ID not found');
-      return;
-    }
-
-    setUploading(true);
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('contactId', contactId);
-      formData.append('companyHQId', companyHQId);
-      formData.append('companyId', companyId);
-
-      // Upload and parse CSV, then create proposal
-      const uploadResponse = await api.post('/api/proposals/assemble/csv', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (uploadResponse.data?.success) {
-        // Navigate to proposal builder with parsed data
-        router.push(`/client-operations/proposals/${uploadResponse.data.proposal.id}`);
-      } else {
-        setError(uploadResponse.data?.error || 'Failed to upload CSV');
-      }
-    } catch (err) {
-      console.error('Error uploading CSV:', err);
-      setError(err.response?.data?.error || 'Failed to upload CSV');
-    } finally {
-      setUploading(false);
+  const handleSelectType = (type) => {
+    setSelectedType(type);
+    if (type === 'phases') {
+      router.push('/client-operations/proposals/create/csv/phases');
+    } else if (type === 'deliverables') {
+      router.push('/client-operations/proposals/create/csv/deliverables');
     }
   };
 
@@ -80,73 +27,76 @@ function CSVUploadContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Upload Proposal from CSV"
-          subtitle="Upload a CSV file with phases and deliverables"
+          title="Upload Templates from CSV"
+          subtitle="Choose which type of template to upload"
           backTo="/client-operations/proposals/create"
           backLabel="Back to Create Proposal"
         />
 
-        {error && (
-          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-8 rounded-2xl bg-white p-6 shadow">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">CSV Format</h2>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p className="text-sm text-gray-600 mb-2">Your CSV should include the following columns:</p>
-                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                  <li><code className="bg-white px-1 rounded">phaseName</code> - Name of the phase</li>
-                  <li><code className="bg-white px-1 rounded">position</code> - Phase order (1, 2, 3...)</li>
-                  <li><code className="bg-white px-1 rounded">deliverableType</code> - Type of deliverable (persona, blog, deck, etc.)</li>
-                  <li><code className="bg-white px-1 rounded">itemLabel</code> - Human-readable label</li>
-                  <li><code className="bg-white px-1 rounded">quantity</code> - Number of items</li>
-                  <li><code className="bg-white px-1 rounded">duration</code> - Duration value (optional)</li>
-                  <li><code className="bg-white px-1 rounded">unitOfMeasure</code> - Unit (day, week, month) (optional)</li>
-                </ul>
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Phase CSV Option */}
+          <div
+            onClick={() => handleSelectType('phases')}
+            className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+          >
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-red-600" />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Select CSV File
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-red-400 transition">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-red-600 hover:text-red-500 focus-within:outline-none">
-                      <span>Upload a file</span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        accept=".csv"
-                        className="sr-only"
-                        onChange={handleFileSelect}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">CSV up to 10MB</p>
-                  {file && (
-                    <p className="text-sm text-gray-900 mt-2">
-                      Selected: <span className="font-semibold">{file.name}</span>
-                    </p>
-                  )}
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Upload Phase CSV
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Upload phases for your proposal templates
+                </p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Required columns:</p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    <li>• Phase Name</li>
+                    <li>• Description (optional)</li>
+                    <li>• Duration (Days) (optional)</li>
+                    <li>• Order</li>
+                  </ul>
                 </div>
               </div>
             </div>
+            <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+              Upload Phase CSV
+            </button>
+          </div>
 
-            <button
-              onClick={handleUpload}
-              disabled={!file || uploading || !contactId || !companyId}
-              className="w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {uploading ? 'Uploading...' : 'Upload & Create Proposal'}
+          {/* Deliverable CSV Option */}
+          <div
+            onClick={() => handleSelectType('deliverables')}
+            className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+          >
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                <Upload className="h-6 w-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Upload Deliverable CSV
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Upload deliverables for your proposal templates
+                </p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Required columns:</p>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    <li>• Phase Name</li>
+                    <li>• Deliverable Name</li>
+                    <li>• Description (optional)</li>
+                    <li>• Quantity</li>
+                    <li>• Unit (optional)</li>
+                    <li>• Duration (optional)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+              Upload Deliverable CSV
             </button>
           </div>
         </div>
@@ -155,7 +105,7 @@ function CSVUploadContent() {
   );
 }
 
-export default function CSVUploadPage() {
+export default function CSVUploadSelectionPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 py-8">
@@ -164,7 +114,7 @@ export default function CSVUploadPage() {
         </div>
       </div>
     }>
-      <CSVUploadContent />
+      <CSVUploadSelectionContent />
     </Suspense>
   );
 }
