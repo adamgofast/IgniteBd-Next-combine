@@ -18,7 +18,8 @@ function TemplateLibraryContent() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
-  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals' | 'make-templates'
+  const [activeTab, setActiveTab] = useState('phases'); // 'phases' | 'deliverables' | 'proposals' | 'make-templates' | 'create-phase' | 'create-deliverable' | 'create-proposal'
+  const [selectedTemplateType, setSelectedTemplateType] = useState(null); // 'phase' | 'deliverable' | 'proposal'
 
   // Initialize - load from localStorage via hook (no auto-fetch, sync is backup only)
   useEffect(() => {
@@ -369,7 +370,10 @@ function TemplateLibraryContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 {/* See Templates Option */}
                 <div
-                  onClick={() => router.push('/client-operations/proposals/create?from=templates')}
+                  onClick={() => {
+                    // Show phase and deliverable templates tabs
+                    setActiveTab('phases');
+                  }}
                   className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
                 >
                   <div className="flex items-start gap-4 mb-4">
@@ -433,7 +437,10 @@ function TemplateLibraryContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Phase Templates */}
               <div
-                onClick={() => router.push('/client-operations/proposals/create/csv/phases')}
+                onClick={() => {
+                  setSelectedTemplateType('phase');
+                  setActiveTab('create-phase');
+                }}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
               >
                 <div className="flex items-start gap-4 mb-4">
@@ -456,7 +463,10 @@ function TemplateLibraryContent() {
 
               {/* Deliverable Templates */}
               <div
-                onClick={() => router.push('/client-operations/proposals/create/csv/deliverables')}
+                onClick={() => {
+                  setSelectedTemplateType('deliverable');
+                  setActiveTab('create-deliverable');
+                }}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
               >
                 <div className="flex items-start gap-4 mb-4">
@@ -480,8 +490,8 @@ function TemplateLibraryContent() {
               {/* Proposal Templates */}
               <div
                 onClick={() => {
-                  // TODO: Route to proposal template creation
-                  alert('Proposal template creation coming soon');
+                  setSelectedTemplateType('proposal');
+                  setActiveTab('create-proposal');
                 }}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
               >
@@ -500,6 +510,109 @@ function TemplateLibraryContent() {
                 </div>
                 <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
                   Create Proposal Template
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Template Type Chooser - Shows after selecting Phase/Deliverable/Proposal */}
+        {(activeTab === 'create-phase' || activeTab === 'create-deliverable' || activeTab === 'create-proposal') && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={() => setActiveTab('make-templates')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Create {selectedTemplateType === 'phase' ? 'Phase' : selectedTemplateType === 'deliverable' ? 'Deliverable' : 'Proposal'} Template
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Make from CSV */}
+              <div
+                onClick={() => {
+                  if (selectedTemplateType === 'phase') {
+                    router.push('/client-operations/proposals/create/csv/phases');
+                  } else if (selectedTemplateType === 'deliverable') {
+                    router.push('/client-operations/proposals/create/csv/deliverables');
+                  } else {
+                    // TODO: Proposal template CSV upload
+                    alert('Proposal template CSV upload coming soon');
+                  }
+                }}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <Upload className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Make from CSV
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Upload a CSV file to bulk create templates.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Upload CSV
+                </button>
+              </div>
+
+              {/* Previous */}
+              <div
+                onClick={() => {
+                  // TODO: Show previous templates to clone
+                  alert('Clone from previous template coming soon');
+                }}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <Copy className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Previous
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Clone an existing template as your starting point.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Use Previous
+                </button>
+              </div>
+
+              {/* Start Scratch */}
+              <div
+                onClick={() => {
+                  // TODO: Route to blank template creation form
+                  alert('Start from scratch template creation coming soon');
+                }}
+                className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
+                    <Plus className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Start Scratch
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Create a new template from scratch with a form.
+                    </p>
+                  </div>
+                </div>
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+                  Create Blank
                 </button>
               </div>
             </div>

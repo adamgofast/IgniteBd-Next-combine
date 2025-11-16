@@ -74,7 +74,7 @@ const navigationGroups = [
   {
     name: 'Client Operations',
     items: [
-      { name: 'Proposal Templates', path: '/templates/library', icon: Layers },
+      { name: 'Proposal Templates', path: '/templates', icon: Layers },
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Work Packages', path: '/workpackages', icon: Box },
       { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
