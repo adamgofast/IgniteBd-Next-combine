@@ -32,7 +32,6 @@ export function mapPhaseCsvToPhaseTemplates(rows, companyHQId) {
     const phaseName = mapped.name || `Phase ${index + 1}`;
     const description = mapped.description || null;
     const durationDays = mapped._durationDays || null;
-    const order = mapped._order || index + 1;
 
     // Validate (non-blocking - show warning but allow)
     const validation = validateMappedData(mapped, 'phase');
@@ -44,7 +43,6 @@ export function mapPhaseCsvToPhaseTemplates(rows, companyHQId) {
       companyHQId,
       name: phaseName.trim(),
       description: description ? description.trim() : null,
-      _order: order,
       _durationDays: durationDays,
       _validation: validation, // Store validation for preview
     };

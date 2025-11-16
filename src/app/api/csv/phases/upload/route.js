@@ -81,7 +81,8 @@ export async function POST(request) {
     // Upsert PhaseTemplate records (unique by companyHQId + name)
     const results = [];
     for (const template of phaseTemplates) {
-      const { _order, ...templateData } = template;
+      // Remove internal fields that aren't in the schema
+      const { _durationDays, _validation, ...templateData } = template;
       
       const phaseTemplate = await prisma.phaseTemplate.upsert({
         where: {
