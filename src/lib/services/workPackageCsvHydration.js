@@ -4,7 +4,16 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { createWorkPackage, upsertPhase, upsertItem } from './workpackageHydrationService';
+import { 
+  createWorkPackage as createWP,
+  upsertPhase as upsertP,
+  upsertItem as upsertI 
+} from './workpackageHydrationService';
+
+// Map to expected names
+const createWorkPackage = createWP;
+const upsertPhase = upsertP;
+const upsertItem = upsertI;
 
 /**
  * Hydrate WorkPackage from mapped CSV data
