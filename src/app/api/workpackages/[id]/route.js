@@ -121,6 +121,18 @@ export async function PATCH(request, { params }) {
             firstName: true,
             lastName: true,
             email: true,
+            contactCompany: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            companyName: true,
           },
         },
         phases: {
@@ -128,7 +140,8 @@ export async function PATCH(request, { params }) {
             items: {
               include: {
                 collateral: true,
-          },
+              },
+              orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
