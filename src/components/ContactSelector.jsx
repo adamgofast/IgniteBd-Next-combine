@@ -154,6 +154,11 @@ export default function ContactSelector({
           <div className="absolute left-3 top-1/2 -translate-y-1/2">
             <Users className="h-5 w-5 text-gray-400" />
           </div>
+          {selectedContactObj && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="h-2 w-2 rounded-full bg-green-500"></div>
+            </div>
+          )}
         </div>
 
         {/* Dropdown Results - Only shows when searching (like Manage Contacts) */}
