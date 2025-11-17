@@ -61,6 +61,9 @@ export const getConfigItemByType = (type) => {
  * Get label for item type
  */
 export const getItemTypeLabel = (type) => {
-  const item = getConfigItemByType(type);
+  if (!type) return 'Unknown';
+  // Normalize to lowercase for matching
+  const normalizedType = type.toLowerCase();
+  const item = getConfigItemByType(normalizedType);
   return item ? item.label : type;
 };
