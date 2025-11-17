@@ -2,47 +2,41 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import PageHeader from '@/components/PageHeader.jsx';
+import ContactSelector from '@/components/ContactSelector.jsx';
 import { ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
- * Proposal Assembler - Templates Flow
+ * Work Package Assembler - Templates Flow
  * Choose phases and deliverables from templates
  */
-function ProposalAssemblerTemplatesContent() {
+function WorkPackageAssemblerTemplatesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const contactId = searchParams.get('contactId');
+  const contactIdFromParams = searchParams.get('contactId');
 
   const [phaseTemplates, setPhaseTemplates] = useState([]);
   const [deliverableTemplates, setDeliverableTemplates] = useState([]);
   const [selectedPhases, setSelectedPhases] = useState([]); // [{ phaseTemplateId, position, deliverables: [{ deliverableType, itemLabel, quantity, duration, unitOfMeasure }] }]
-  const [contacts, setContacts] = useState([]);
+  const [contactId, setContactId] = useState(contactIdFromParams || '');
+  const [companyId, setCompanyId] = useState('');
+  const [selectedContact, setSelectedContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const cachedContacts = window.localStorage.getItem('contacts');
-    if (cachedContacts) {
-      try {
-        const parsed = JSON.parse(cachedContacts);
-        if (Array.isArray(parsed)) {
-          setContacts(parsed);
-        }
-      } catch (error) {
-        console.warn('Failed to parse cached contacts', error);
-      }
+    if (contactIdFromParams) {
+      setContactId(contactIdFromParams);
     }
+  }, [contactIdFromParams]);
 
-    if (!contactId) {
-      router.push('/workpackages/launch');
-      return;
+  useEffect(() => {
+    if (contactId) {
+      loadTemplates();
     }
-    loadTemplates();
-  }, [contactId, router]);
+  }, [contactId]);
 
   const loadTemplates = async () => {
     if (typeof window === 'undefined') return;
@@ -143,17 +137,20 @@ function ProposalAssemblerTemplatesContent() {
       return;
     }
 
+    if (!contactId) {
+      setError('Please select a contact');
+      return;
+    }
+
     if (typeof window === 'undefined') {
       setError('Cannot save in server environment');
       return;
     }
     
-    // Get companyHQId and companyId from contact
-    const contact = contacts.find(c => c.id === contactId);
     const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
     
-    if (!companyHQId || !contact?.contactCompanyId) {
-      setError('Company information not found');
+    if (!companyHQId) {
+      setError('CompanyHQ ID not found');
       return;
     }
 
@@ -161,33 +158,26 @@ function ProposalAssemblerTemplatesContent() {
       setSaving(true);
       setError('');
 
-      const response = await api.post('/api/proposals/assemble', {
-        contactId,
-        companyHQId,
-        companyId: contact.contactCompanyId,
-        title: prompt('Enter proposal title:') || 'New Proposal',
-        estimatedStart: new Date().toISOString(),
-        purpose: null,
-        totalPrice: null,
-        assemblyType: 'templates',
-        data: {
-          phases: selectedPhases,
-        },
-      });
-
-      if (response.data?.success) {
-        const proposal = response.data.proposal;
-        
-        // Save to localStorage
-        const cached = window.localStorage.getItem('proposals');
-        const existing = cached ? JSON.parse(cached) : [];
-        const updated = [...existing, proposal];
-        window.localStorage.setItem('proposals', JSON.stringify(updated));
-        
-        router.push(`/proposals/${proposal.id}`);
-      } else {
-        setError(response.data?.error || 'Failed to create proposal');
-      }
+      // TODO: Create work package API endpoint for templates
+      // For now, redirect to blank creation with contact pre-selected
+      router.push(`/workpackages/blank?contactId=${contactId}&companyId=${companyId}`);
+      
+      // Future: When work package assemble API exists:
+      // const response = await api.post('/api/workpackages/assemble', {
+      //   contactId,
+      //   companyHQId,
+      //   companyId,
+      //   title: prompt('Enter work package title:') || 'New Work Package',
+      //   description: null,
+      //   totalCost: null,
+      //   assemblyType: 'templates',
+      //   data: {
+      //     phases: selectedPhases,
+      //   },
+      // });
+      // if (response.data?.success) {
+      //   router.push(`/workpackages/${response.data.workPackage.id}`);
+      // }
     } catch (err) {
       console.error('Error creating proposal:', err);
       setError(err.response?.data?.error || 'Failed to create proposal');
@@ -209,24 +199,47 @@ function ProposalAssemblerTemplatesContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Build Proposal from Templates</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Choose phases and add deliverables
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Build Work Package from Templates"
+          subtitle="Choose phases and add deliverables"
+          backTo="/workpackages"
+          backLabel="Back to Work Packages"
+        />
 
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 border border-red-200 p-4">
+          <div className="mt-6 rounded-lg bg-red-50 border border-red-200 p-4">
             <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Contact Selection */}
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+          <div className="max-w-md">
+            <ContactSelector
+              onContactSelect={(contact, company) => {
+                setSelectedContact(contact);
+                setContactId(contact.id);
+                setCompanyId(company?.id || '');
+              }}
+              selectedContact={selectedContact}
+            />
+          </div>
+          {selectedContact && (
+            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+              <p className="text-sm text-green-800">
+                <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                {selectedContact.contactCompany?.companyName && (
+                  <span> • {selectedContact.contactCompany.companyName}</span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {!contactId && (
+          <div className="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+            <p className="text-sm text-yellow-800">Please select a contact to continue</p>
           </div>
         )}
 
@@ -383,10 +396,10 @@ function ProposalAssemblerTemplatesContent() {
 
             <button
               onClick={handleSave}
-              disabled={saving || selectedPhases.length === 0}
+              disabled={saving || selectedPhases.length === 0 || !contactId}
               className="w-full rounded-lg bg-red-600 px-6 py-3 text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {saving ? 'Creating...' : 'Create Proposal'}
+              {saving ? 'Creating...' : 'Create Work Package'}
             </button>
           </div>
         </div>
@@ -395,7 +408,7 @@ function ProposalAssemblerTemplatesContent() {
   );
 }
 
-export default function ProposalAssemblerTemplatesPage() {
+export default function WorkPackageAssemblerTemplatesPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 py-8">
@@ -404,7 +417,7 @@ export default function ProposalAssemblerTemplatesPage() {
         </div>
       </div>
     }>
-      <ProposalAssemblerTemplatesContent />
+      <WorkPackageAssemblerTemplatesContent />
     </Suspense>
   );
 }

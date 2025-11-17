@@ -3,6 +3,7 @@
 import { useState, Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
+import ContactSelector from '@/components/ContactSelector.jsx';
 import { Copy, X, Package } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -16,6 +17,9 @@ function CloneWorkPackageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [companyHQId, setCompanyHQId] = useState('');
+  const [contactId, setContactId] = useState('');
+  const [companyId, setCompanyId] = useState('');
+  const [selectedContact, setSelectedContact] = useState(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -77,6 +81,31 @@ function CloneWorkPackageContent() {
             {error}
           </div>
         )}
+
+        {/* Contact Selection */}
+        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+          <div className="max-w-md">
+            <ContactSelector
+              onContactSelect={(contact, company) => {
+                setSelectedContact(contact);
+                setContactId(contact.id);
+                setCompanyId(company?.id || '');
+              }}
+              selectedContact={selectedContact}
+            />
+          </div>
+          {selectedContact && (
+            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+              <p className="text-sm text-green-800">
+                <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                {selectedContact.contactCompany?.companyName && (
+                  <span> • {selectedContact.contactCompany.companyName}</span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
 
         {workPackages.length === 0 ? (
           <div className="mt-8 rounded-lg border-2 border-dashed border-gray-300 bg-white p-12 text-center">
