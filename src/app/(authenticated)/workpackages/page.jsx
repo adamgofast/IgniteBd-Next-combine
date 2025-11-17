@@ -104,7 +104,7 @@ export default function WorkPackagesPage() {
             Work Packages ({workPackages.length})
           </h2>
           <button
-            onClick={() => router.push('/workpackages/new')}
+            onClick={() => router.push('/workpackages/create')}
             className="flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
           >
             <Plus className="h-4 w-4" />
@@ -120,7 +120,7 @@ export default function WorkPackagesPage() {
               Create your first work package to start tracking client deliverables
             </p>
             <button
-              onClick={() => router.push('/workpackages/new')}
+              onClick={() => router.push('/workpackages/create')}
               className="mt-6 rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700"
             >
               Create Work Package
