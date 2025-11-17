@@ -37,6 +37,18 @@ export async function GET(request, { params }) {
             firstName: true,
             lastName: true,
             email: true,
+            contactCompany: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            companyName: true,
           },
         },
         phases: {
@@ -44,7 +56,8 @@ export async function GET(request, { params }) {
             items: {
               include: {
                 collateral: true,
-          },
+              },
+              orderBy: { createdAt: 'asc' },
             },
           },
           orderBy: { position: 'asc' },
