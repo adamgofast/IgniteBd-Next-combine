@@ -164,3 +164,52 @@ export async function PATCH(request, { params }) {
   }
 }
 
+/**
+ * DELETE /api/workpackages/:id
+ * Delete a WorkPackage and all related phases/items
+ */
+export async function DELETE(request, { params }) {
+  try {
+    await verifyFirebaseToken(request);
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 },
+    );
+  }
+
+  try {
+    // Handle Next.js 15 async params
+    const resolvedParams = params && typeof params.then === 'function' ? await params : params;
+    const { id } = resolvedParams || {};
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'WorkPackage ID is required' },
+        { status: 400 },
+      );
+    }
+
+    // Delete WorkPackage (cascade will delete phases and items)
+    await prisma.workPackage.delete({
+      where: { id },
+    });
+
+    console.log('✅ WorkPackage deleted:', id);
+
+    return NextResponse.json({
+      success: true,
+      message: 'WorkPackage deleted successfully',
+    });
+  } catch (error) {
+    console.error('❌ DeleteWorkPackage error:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to delete work package',
+        details: error.message,
+      },
+      { status: 500 },
+    );
+  }
+}
+

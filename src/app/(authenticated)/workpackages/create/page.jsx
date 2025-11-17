@@ -3,19 +3,19 @@
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Upload, FileText, Copy, Plus, Box } from 'lucide-react';
+import { Upload, FileText, Copy, Plus } from 'lucide-react';
 
 /**
- * Work Package Start Page
+ * Work Packages Creation Landing Page
  * 4-option landing page for creating work packages
  */
-function WorkPackageStartContent() {
+function WorkPackagesCreateContent() {
   const router = useRouter();
 
   const handleOptionSelect = async (option) => {
     switch (option) {
       case 'csv': {
-        router.push('/workpackages/create/csv');
+        router.push('/workpackages/csv');
         break;
       }
       case 'templates': {
@@ -23,12 +23,11 @@ function WorkPackageStartContent() {
         break;
       }
       case 'previous': {
-        // TODO: Show modal with work package list, then route to clone flow
-        router.push('/workpackages/create/clone');
+        router.push('/workpackages/clone');
         break;
       }
       case 'blank': {
-        router.push('/workpackages/create/blank');
+        router.push('/workpackages/blank');
         break;
       }
     }
@@ -109,7 +108,7 @@ function WorkPackageStartContent() {
   );
 }
 
-export default function WorkPackageStartPage() {
+export default function WorkPackagesCreatePage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 py-8">
@@ -118,8 +117,7 @@ export default function WorkPackageStartPage() {
         </div>
       </div>
     }>
-      <WorkPackageStartContent />
+      <WorkPackagesCreateContent />
     </Suspense>
   );
 }
-

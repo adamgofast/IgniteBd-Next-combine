@@ -3,64 +3,31 @@
 import { useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
-import { Upload, FileText, Copy, Plus } from 'lucide-react';
+import { Plus, Eye } from 'lucide-react';
 
 /**
- * Work Packages Landing Page
- * 4-option landing page for creating work packages
+ * Work Packages Fork Page
+ * Choose between Create or View
  */
-function WorkPackagesContent() {
+function WorkPackagesForkContent() {
   const router = useRouter();
-
-  const handleOptionSelect = async (option) => {
-    switch (option) {
-      case 'csv': {
-        router.push('/workpackages/csv');
-        break;
-      }
-      case 'templates': {
-        router.push('/workpackages/assemble/templates');
-        break;
-      }
-      case 'previous': {
-        router.push('/workpackages/clone');
-        break;
-      }
-      case 'blank': {
-        router.push('/workpackages/blank');
-        break;
-      }
-    }
-  };
 
   const OPTIONS = [
     {
-      id: 'csv',
-      title: 'Upload From CSV',
-      description: 'Upload a CSV containing phases and deliverables. IgniteBD will auto-generate the work package.',
-      icon: Upload,
-      buttonText: 'Upload CSV',
-    },
-    {
-      id: 'templates',
-      title: 'Use Company Templates',
-      description: 'Load phases and deliverables from your template library.',
-      icon: FileText,
-      buttonText: 'Use Templates',
-    },
-    {
-      id: 'previous',
-      title: 'Use a Previous Work Package',
-      description: 'Copy an existing work package as your starting point.',
-      icon: Copy,
-      buttonText: 'Copy Existing',
-    },
-    {
-      id: 'blank',
-      title: 'Start Blank',
-      description: 'Create a work package from scratch.',
+      id: 'create',
+      title: 'Create Work Package',
+      description: 'Build a new work package from CSV, templates, previous packages, or start from scratch.',
       icon: Plus,
-      buttonText: 'Build From Scratch',
+      buttonText: 'Create New',
+      route: '/workpackages/create',
+    },
+    {
+      id: 'view',
+      title: 'View Work Packages',
+      description: 'Browse, manage, and delete existing work packages.',
+      icon: Eye,
+      buttonText: 'View All',
+      route: '/workpackages/view',
     },
   ];
 
@@ -69,7 +36,7 @@ function WorkPackagesContent() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <PageHeader
           title="Work Packages"
-          subtitle="Choose how you want to build your work package"
+          subtitle="Create new work packages or manage existing ones"
         />
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -79,7 +46,7 @@ function WorkPackagesContent() {
               <div
                 key={option.id}
                 className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer hover:border-red-300"
-                onClick={() => handleOptionSelect(option.id)}
+                onClick={() => router.push(option.route)}
               >
                 <div className="flex items-start gap-4 mb-4">
                   <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-red-100 flex items-center justify-center">
@@ -115,7 +82,7 @@ export default function WorkPackagesPage() {
         </div>
       </div>
     }>
-      <WorkPackagesContent />
+      <WorkPackagesForkContent />
     </Suspense>
   );
 }
