@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
 import { Plus, X } from 'lucide-react';
@@ -13,16 +13,38 @@ import api from '@/lib/api';
  */
 function BlankWorkPackageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     totalCost: '',
   });
-  const [contactId, setContactId] = useState('');
-  const [companyId, setCompanyId] = useState('');
+  const [contactId, setContactId] = useState(searchParams.get('contactId') || '');
+  const [companyId, setCompanyId] = useState(searchParams.get('companyId') || '');
   const [selectedContact, setSelectedContact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Load contact from params if provided
+  useEffect(() => {
+    if (contactId && typeof window !== 'undefined') {
+      const cachedContacts = window.localStorage.getItem('contacts');
+      if (cachedContacts) {
+        try {
+          const parsed = JSON.parse(cachedContacts);
+          const contact = parsed.find(c => c.id === contactId);
+          if (contact) {
+            setSelectedContact(contact);
+            if (contact.contactCompany?.id) {
+              setCompanyId(contact.contactCompany.id);
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to parse cached contacts', err);
+        }
+      }
+    }
+  }, [contactId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
