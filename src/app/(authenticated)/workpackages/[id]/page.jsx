@@ -142,16 +142,16 @@ export default function WorkPackagePage() {
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
-                                <h3 className="font-semibold text-gray-900">{item.itemLabel}</h3>
+                                <h3 className="font-semibold text-gray-900">{item.deliverableLabel || item.itemLabel}</h3>
                                 <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                                  {getItemTypeLabel(item.itemType)}
+                                  {getItemTypeLabel(item.deliverableType || item.itemType)}
                                 </span>
                                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(item.status)}`}>
                                   {item.status}
                                 </span>
                               </div>
-                              {item.itemDescription && (
-                                <p className="mt-1 text-sm text-gray-600">{item.itemDescription}</p>
+                              {(item.deliverableDescription || item.itemDescription) && (
+                                <p className="mt-1 text-sm text-gray-600">{item.deliverableDescription || item.itemDescription}</p>
                               )}
                               <div className="mt-2 flex items-center gap-4">
                                 <span className="text-sm text-gray-600">
@@ -224,16 +224,16 @@ export default function WorkPackagePage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
-                            <h3 className="font-semibold text-gray-900">{item.itemLabel}</h3>
+                            <h3 className="font-semibold text-gray-900">{item.deliverableLabel || item.itemLabel}</h3>
                             <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                              {getItemTypeLabel(item.itemType)}
+                              {getItemTypeLabel(item.deliverableType || item.itemType)}
                             </span>
                             <span className={`rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(item.status)}`}>
                               {item.status}
                             </span>
                           </div>
-                          {item.itemDescription && (
-                            <p className="mt-1 text-sm text-gray-600">{item.itemDescription}</p>
+                          {(item.deliverableDescription || item.itemDescription) && (
+                            <p className="mt-1 text-sm text-gray-600">{item.deliverableDescription || item.itemDescription}</p>
                           )}
                           <div className="mt-2 flex items-center gap-4">
                             <span className="text-sm text-gray-600">

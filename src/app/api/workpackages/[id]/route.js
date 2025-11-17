@@ -18,7 +18,9 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { id } = params || {};
+    // Handle Next.js 15 async params
+    const resolvedParams = params && typeof params.then === 'function' ? await params : params;
+    const { id } = resolvedParams || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'WorkPackage ID is required' },
@@ -98,7 +100,9 @@ export async function PATCH(request, { params }) {
   }
 
   try {
-    const { id } = params || {};
+    // Handle Next.js 15 async params
+    const resolvedParams = params && typeof params.then === 'function' ? await params : params;
+    const { id } = resolvedParams || {};
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'WorkPackage ID is required' },
