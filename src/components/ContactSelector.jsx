@@ -121,7 +121,13 @@ export default function ContactSelector({
   // Handle contact selection
   const handleSelectContact = (contact) => {
     setSelectedContactId(contact.id);
-    setContactSearch(`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '');
+    const displayName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email || '';
+    setContactSearch(displayName);
+    
+    // Clear search to close dropdown
+    setTimeout(() => {
+      setContactSearch(displayName);
+    }, 0);
     
     // Call callback - support both onContactSelect and onContactChange
     if (onContactSelect) {
@@ -161,8 +167,8 @@ export default function ContactSelector({
           )}
         </div>
 
-        {/* Dropdown Results - Only shows when searching (like Manage Contacts) */}
-        {contactSearch && availableContacts.length > 0 && (
+        {/* Dropdown Results - Only shows when searching AND not already selected (like Manage Contacts) */}
+        {contactSearch && availableContacts.length > 0 && !selectedContactObj && (
           <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
             {availableContacts.map((contact) => (
               <button
