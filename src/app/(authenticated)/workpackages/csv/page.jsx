@@ -15,9 +15,12 @@ function WorkPackageCSVUploadContent() {
   const router = useRouter();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [validation, setValidation] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState('upload'); // 'upload' | 'preview' | 'success'
+  const [warning, setWarning] = useState('');
+  const [step, setStep] = useState('upload'); // 'upload' | 'validate' | 'preview' | 'success'
   const [contactId, setContactId] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
@@ -59,6 +62,74 @@ function WorkPackageCSVUploadContent() {
     }).filter(row => Object.values(row).some(v => v)); // Remove empty rows
     
     return { headers, rows };
+  };
+
+  // Validate mapped data after mapping
+  const validateWorkPackageData = (rows) => {
+    const errors = [];
+    const warnings = [];
+    let validRows = 0;
+    let invalidRows = 0;
+
+    if (rows.length === 0) {
+      return {
+        isValid: false,
+        errors: ['CSV file contains no data rows'],
+        warnings: [],
+        validRows: 0,
+        invalidRows: 0,
+      };
+    }
+
+    // Validate each row
+    rows.forEach((row, index) => {
+      const rowErrors = [];
+      const rowNum = index + 2; // +2 because row 1 is headers
+
+      // Required fields
+      if (!row.phasename || !row.phasename.trim()) {
+        rowErrors.push(`Row ${rowNum}: Missing phaseName`);
+      }
+      if (!row.phaseposition || isNaN(parseInt(row.phaseposition, 10))) {
+        rowErrors.push(`Row ${rowNum}: Invalid or missing phasePosition`);
+      }
+      if (!row.deliverablelabel || !row.deliverablelabel.trim()) {
+        rowErrors.push(`Row ${rowNum}: Missing deliverableLabel`);
+      }
+      if (!row.deliverabletype || !row.deliverabletype.trim()) {
+        rowErrors.push(`Row ${rowNum}: Missing deliverableType`);
+      }
+      if (!row.quantity || isNaN(parseInt(row.quantity, 10)) || parseInt(row.quantity, 10) < 1) {
+        rowErrors.push(`Row ${rowNum}: Invalid or missing quantity`);
+      }
+      if (!row.estimatedhourseach || isNaN(parseInt(row.estimatedhourseach, 10)) || parseInt(row.estimatedhourseach, 10) < 0) {
+        rowErrors.push(`Row ${rowNum}: Invalid or missing estimatedHoursEach`);
+      }
+      if (!row.status || !row.status.trim()) {
+        rowErrors.push(`Row ${rowNum}: Missing status`);
+      }
+
+      // Optional but recommended
+      if (!row.proposaldescription || !row.proposaldescription.trim()) {
+        warnings.push(`Row ${rowNum}: Missing proposalDescription (recommended)`);
+      }
+
+      if (rowErrors.length > 0) {
+        errors.push(...rowErrors);
+        invalidRows++;
+      } else {
+        validRows++;
+      }
+    });
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      validRows,
+      invalidRows,
+      totalRows: rows.length,
+    };
   };
 
   // Validate CSV headers
@@ -107,6 +178,20 @@ function WorkPackageCSVUploadContent() {
         setError(validation.error);
         setFile(null);
         return;
+      }
+
+      // Validate mapped data (after mapping, before preview)
+      const validationResults = validateWorkPackageData(rows);
+      setValidation(validationResults);
+      
+      if (!validationResults.isValid) {
+        setError(`Validation failed: ${validationResults.errors.join(', ')}`);
+        setFile(null);
+        return;
+      }
+
+      if (validationResults.warnings && validationResults.warnings.length > 0) {
+        setWarning(validationResults.warnings.join(' '));
       }
 
       // Map CSV rows to preview format
