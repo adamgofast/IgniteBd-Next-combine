@@ -121,6 +121,11 @@ export default function WorkPackagePage() {
     );
   }
 
+  // Calculate total estimated hours
+  const totalEstimatedHours = workPackage.phases?.reduce((sum, phase) => {
+    return sum + (phase.totalEstimatedHours || 0);
+  }, 0) || 0;
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4">
@@ -139,6 +144,9 @@ export default function WorkPackagePage() {
             {workPackage.contact && (
               <p className="mt-1 text-gray-600">
                 Client: {workPackage.contact.firstName} {workPackage.contact.lastName}
+                {workPackage.contact.contactCompany?.companyName && (
+                  <span> • {workPackage.contact.contactCompany.companyName}</span>
+                )}
               </p>
             )}
           </div>
@@ -212,24 +220,43 @@ function OwnerView({ workPackage, workPackageId }) {
     return { completed, total, percentage: total > 0 ? Math.round((completed / total) * 100) : 0 };
   };
 
+  // Calculate total estimated hours for this view
+  const totalEstimatedHours = workPackage.phases?.reduce((sum, phase) => {
+    return sum + (phase.totalEstimatedHours || 0);
+  }, 0) || 0;
+
   return (
     <>
-      {/* Work Package Metadata (Owner Only) */}
-      {workPackage.description && (
-        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow">
-          <h3 className="text-sm font-semibold text-gray-500 mb-2">Description</h3>
-          <p className="text-gray-900">{workPackage.description}</p>
+      {/* Work Package Header */}
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            {workPackage.description && (
+              <p className="text-gray-600 mb-4">{workPackage.description}</p>
+            )}
+            <div className="flex items-center gap-6 text-sm">
+              {workPackage.totalCost && (
+                <div>
+                  <span className="text-gray-500">Total Cost: </span>
+                  <span className="font-semibold text-gray-900">
+                    ${workPackage.totalCost.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {totalEstimatedHours > 0 && (
+                <div>
+                  <span className="text-gray-500">Total Hours: </span>
+                  <span className="font-semibold text-gray-900">
+                    {totalEstimatedHours}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
-      {workPackage.totalCost && (
-        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow">
-          <h3 className="text-sm font-semibold text-gray-500 mb-2">Total Cost</h3>
-          <p className="text-2xl font-bold text-gray-900">${workPackage.totalCost.toLocaleString()}</p>
-        </div>
-      )}
-
-      {/* Phases */}
+      {/* Phases - Hierarchical View */}
       {workPackage.phases && workPackage.phases.length > 0 ? (
         <div className="space-y-6">
           {workPackage.phases.map((phase) => (
@@ -535,52 +562,7 @@ function ClientViewPreview({ workPackage }) {
         </div>
       )}
 
-      {/* Items without phase */}
-      {workPackage.items && workPackage.items.filter(item => !item.workPackagePhaseId).length > 0 && (
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
-          <h2 className="mb-4 text-xl font-semibold text-gray-900">Deliverables</h2>
-          <div className="space-y-4">
-            {workPackage.items
-              .filter(item => !item.workPackagePhaseId)
-              .map((item) => {
-                const progress = getProgressForItem(item);
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {item.deliverableLabel || item.itemLabel}
-                        </h3>
-                        {item.deliverableDescription && (
-                          <p className="mt-2 text-gray-600">
-                            {item.deliverableDescription}
-                          </p>
-                        )}
-                        <div className="mt-4 flex items-center gap-6">
-                          <div>
-                            <span className="text-sm text-gray-500">Quantity: </span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {item.quantity}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-500">Progress: </span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {progress.completed} of {progress.total} complete
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
+      {/* Note: Items without phase are not shown in client view */}
     </div>
   );
 }
