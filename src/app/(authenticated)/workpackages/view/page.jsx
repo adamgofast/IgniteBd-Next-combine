@@ -15,7 +15,7 @@ export default function WorkPackagesViewPage() {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(null);
 
-  // Load from localStorage first
+  // Load from localStorage first (check company hydration cache too)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -28,18 +28,42 @@ export default function WorkPackagesViewPage() {
     const storedContactId = window.localStorage.getItem('selectedContactId') || '';
     setContactId(storedContactId);
 
-    // Load from localStorage
-    const cached = window.localStorage.getItem('workPackages');
+    // First try direct workPackages key
+    let cached = window.localStorage.getItem('workPackages');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setWorkPackages(parsed);
+          setLoading(false);
+          return;
         }
       } catch (error) {
         console.warn('Failed to parse cached work packages', error);
       }
     }
+
+    // Fallback to company hydration cache
+    if (storedHQId) {
+      const hydrationKey = `companyHydration_${storedHQId}`;
+      const hydrationData = window.localStorage.getItem(hydrationKey);
+      if (hydrationData) {
+        try {
+          const parsed = JSON.parse(hydrationData);
+          if (parsed.data?.workPackages && Array.isArray(parsed.data.workPackages)) {
+            console.log(`📦 Found ${parsed.data.workPackages.length} work packages in company hydration cache`);
+            setWorkPackages(parsed.data.workPackages);
+            // Also store in direct key for consistency
+            window.localStorage.setItem('workPackages', JSON.stringify(parsed.data.workPackages));
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to parse company hydration data:', err);
+        }
+      }
+    }
+
     setLoading(false);
   }, []);
 

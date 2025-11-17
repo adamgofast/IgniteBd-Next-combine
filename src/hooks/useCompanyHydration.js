@@ -22,6 +22,7 @@ export function useCompanyHydration(companyHQId) {
     proposals: [],
     phaseTemplates: [],
     deliverableTemplates: [],
+    workPackages: [],
     stats: {
       personaCount: 0,
       contactCount: 0,
@@ -87,6 +88,7 @@ export function useCompanyHydration(companyHQId) {
         proposals: response.data.proposals || [],
         phaseTemplates: response.data.phaseTemplates || [],
         deliverableTemplates: response.data.deliverableTemplates || [],
+        workPackages: response.data.workPackages || [],
         stats: response.data.stats || {
           personaCount: 0,
           contactCount: 0,
@@ -121,6 +123,7 @@ export function useCompanyHydration(companyHQId) {
       localStorage.setItem('personaId', hydratedData.personas[0]?.id || null);
       localStorage.setItem('contacts', JSON.stringify(hydratedData.contacts));
       localStorage.setItem('products', JSON.stringify(hydratedData.products));
+      localStorage.setItem('workPackages', JSON.stringify(hydratedData.workPackages));
       localStorage.setItem('pipelines', JSON.stringify(hydratedData.pipelines));
       localStorage.setItem('proposals', JSON.stringify(hydratedData.proposals));
       localStorage.setItem('phaseTemplates', JSON.stringify(hydratedData.phaseTemplates));

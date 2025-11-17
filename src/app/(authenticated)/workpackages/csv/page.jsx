@@ -255,10 +255,47 @@ function WorkPackageCSVUploadContent() {
       });
 
       if (response.data?.success) {
+        const newWorkPackage = response.data.workPackage;
+        
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem('workPackages');
+          let workPackages = [];
+          if (cached) {
+            try {
+              workPackages = JSON.parse(cached);
+            } catch (err) {
+              console.warn('Failed to parse cached work packages', err);
+            }
+          }
+          // Add new work package to the beginning
+          workPackages = [newWorkPackage, ...workPackages];
+          window.localStorage.setItem('workPackages', JSON.stringify(workPackages));
+          
+          // Also update company hydration cache if it exists
+          const companyHQId = window.localStorage.getItem('companyHQId') || window.localStorage.getItem('companyId');
+          if (companyHQId) {
+            const hydrationKey = `companyHydration_${companyHQId}`;
+            const hydrationData = window.localStorage.getItem(hydrationKey);
+            if (hydrationData) {
+              try {
+                const parsed = JSON.parse(hydrationData);
+                if (parsed.data) {
+                  parsed.data.workPackages = [newWorkPackage, ...(parsed.data.workPackages || [])];
+                  parsed.timestamp = new Date().toISOString();
+                  window.localStorage.setItem(hydrationKey, JSON.stringify(parsed));
+                }
+              } catch (err) {
+                console.warn('Failed to update company hydration cache', err);
+              }
+            }
+          }
+        }
+        
         setStep('success');
         // Redirect after 2 seconds
         setTimeout(() => {
-          router.push(`/workpackages/${response.data.workPackage.id}`);
+          router.push(`/workpackages/${newWorkPackage.id}`);
         }, 2000);
       } else {
         setError(response.data?.error || 'Failed to import work package');
