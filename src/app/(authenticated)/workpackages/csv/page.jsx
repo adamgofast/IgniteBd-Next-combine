@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/PageHeader.jsx';
 import ContactSelector from '@/components/ContactSelector.jsx';
-import { Upload, FileText, CheckCircle, X, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 
 /**
@@ -22,7 +22,7 @@ function WorkPackageCSVUploadContent() {
   const [companyId, setCompanyId] = useState('');
   const [selectedContact, setSelectedContact] = useState(null);
 
-  // Parse CSV file
+  // Parse CSV file (handles quoted fields)
   const parseCSV = (text) => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
@@ -48,7 +48,7 @@ function WorkPackageCSVUploadContent() {
       return result;
     };
     
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/"/g, ''));
+    const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/"/g, '').trim());
     const rows = lines.slice(1).map(line => {
       const values = parseLine(line).map(v => v.replace(/^"|"$/g, ''));
       const row = {};
@@ -130,6 +130,7 @@ function WorkPackageCSVUploadContent() {
         headers,
         rows: previewData,
         totalRows: rows.length,
+        allRows: rows, // Store all rows for submission
       });
       setStep('preview');
     } catch (err) {
@@ -143,6 +144,11 @@ function WorkPackageCSVUploadContent() {
   const handleUpload = async () => {
     if (!file || !contactId) {
       setError('Please select a file and contact');
+      return;
+    }
+
+    if (!preview || !preview.allRows || preview.allRows.length === 0) {
+      setError('No data to create work package');
       return;
     }
 
@@ -180,146 +186,211 @@ function WorkPackageCSVUploadContent() {
     }
   };
 
+  // Download CSV template
+  const handleDownloadTemplate = () => {
+    const template = `proposalDescription,proposalTotalCost,proposalNotes,phaseName,phasePosition,phaseDescription,deliverableLabel,deliverableType,deliverableDescription,quantity,unitOfMeasure,estimatedHoursEach,status
+"IgniteBD Starter Build-Out focusing on strategic foundation, collateral, CRM setup, and campaign readiness.","1500","Approved via email.","BD Strategic Setup",1,"Establish the strategic foundation for your BD system by defining targets, events, and opportunity landscape.","Target Personas",PERSONA,"Develop 3 persona profiles defining ideal BD targets.",3,persona,4,not_started
+"IgniteBD Starter Build-Out focusing on strategic foundation, collateral, CRM setup, and campaign readiness.","1500","Approved via email.","BD Strategic Setup",1,"Establish the strategic foundation for your BD system by defining targets, events, and opportunity landscape.","Event Selection",EVENT,"Identify 6 key industry events most likely to generate BD opportunities.",6,event,1,not_started
+"IgniteBD Starter Build-Out focusing on strategic foundation, collateral, CRM setup, and campaign readiness.","1500","Approved via email.","Initial Collateral",2,"Develop the core collateral assets needed to execute BD outreach.","Outreach Templates",TEMPLATE,"Draft 6 outreach templates tailored for warm, cold, and follow-up scenarios.",6,template,1,not_started
+"IgniteBD Starter Build-Out focusing on strategic foundation, collateral, CRM setup, and campaign readiness.","1500","Approved via email.","Initial Collateral",2,"Develop the core collateral assets needed to execute BD outreach.","Blog Posts",BLOG,"Write 5 SEO-optimized blog posts to increase visibility and demonstrate thought leadership.",5,post,6,not_started`;
+
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'work-package-template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  if (step === 'success') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-lg border-2 border-green-200 bg-green-50 p-8 text-center">
+            <CheckCircle className="mx-auto h-16 w-16 text-green-600 mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Work Package Created Successfully!</h2>
+            <p className="text-gray-600">Redirecting to your work package...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'preview') {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <PageHeader
+            title="Preview Work Package"
+            subtitle="Review your CSV data before creating the work package"
+            backTo="/workpackages"
+            backLabel="Back to Work Packages"
+          />
+
+          {error && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-800">Error</p>
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Contact/Company Selection */}
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Contact</h3>
+            <div className="max-w-md">
+              <ContactSelector
+                onContactSelect={(contact, company) => {
+                  setSelectedContact(contact);
+                  setContactId(contact.id);
+                  setCompanyId(company?.id || '');
+                }}
+                selectedContact={selectedContact}
+              />
+            </div>
+            {selectedContact && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm text-green-800">
+                  <strong>Selected:</strong> {selectedContact.firstName} {selectedContact.lastName}
+                  {selectedContact.contactCompany?.companyName && (
+                    <span> • {selectedContact.contactCompany.companyName}</span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Preview Table */}
+          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">CSV Preview</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Showing first 5 of {preview.totalRows} rows
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phase Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deliverable Label</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hours Each</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {preview.rows.map((row, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-3 text-sm text-gray-900">{row.phaseName}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{row.deliverableLabel}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{row.deliverableType}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{row.quantity || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{row.estimatedHoursEach || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{row.status || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex items-center justify-end gap-4">
+            <button
+              onClick={() => {
+                setStep('upload');
+                setPreview(null);
+                setFile(null);
+              }}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={loading || !contactId || !companyId}
+              className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creating...' : 'Create Work Package'}
+            </button>
+            {(!contactId || !companyId) && (
+              <p className="text-xs text-gray-500 mt-2">
+                Please select a contact to continue
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <PageHeader
-          title="Upload Work Package from CSV"
-          subtitle="Import a complete work package with phases and deliverables"
+          title="Upload From CSV"
+          subtitle="Upload a CSV file to create a work package with phases and deliverables"
           backTo="/workpackages"
           backLabel="Back to Work Packages"
         />
 
         {error && (
-          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center gap-2 text-sm text-red-700">
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {step === 'upload' && (
-          <div className="mt-8 space-y-6">
-            {/* Contact Selection */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
-              <ContactSelector
-                onContactSelect={(contact, company) => {
-                  setContactId(contact.id);
-                  setCompanyId(company?.id || '');
-                  setSelectedContact(contact);
-                }}
-                selectedContact={selectedContact}
-              />
-            </div>
-
-            {/* File Upload */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Upload CSV File
-              </h3>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <span className="text-red-600 hover:text-red-700 font-semibold">
-                    Choose CSV File
-                  </span>
-                </label>
-                {file && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Selected: {file.name}
-                  </p>
-                )}
-              </div>
-              <p className="mt-4 text-sm text-gray-500">
-                CSV must include: proposalDescription, proposalTotalCost, proposalNotes, phaseName, phasePosition, phaseDescription, deliverableLabel, deliverableType, deliverableDescription, quantity, unitOfMeasure, estimatedHoursEach, status
-              </p>
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">Error</p>
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           </div>
         )}
 
-        {step === 'preview' && preview && (
-          <div className="mt-8 space-y-6">
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Preview ({preview.totalRows} rows total)
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Phase
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Deliverable
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Quantity
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Hours Each
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {preview.rows.map((row, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2 text-sm text-gray-900">
-                          {row.phaseName}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-gray-900">
-                          {row.deliverableLabel}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-gray-600">
-                          {row.quantity}
-                        </td>
-                        <td className="px-3 py-2 text-sm text-gray-600">
-                          {row.estimatedHoursEach}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-6 flex gap-4">
-                <button
-                  onClick={handleUpload}
-                  disabled={!contactId || loading}
-                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Creating...' : 'Create Work Package'}
-                </button>
-                <button
-                  onClick={() => {
-                    setStep('upload');
-                    setPreview(null);
-                    setFile(null);
-                  }}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
+        <div className="mt-8 rounded-xl border-2 border-gray-200 bg-white p-8">
+          <div className="text-center">
+            <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <Upload className="h-8 w-8 text-red-600" />
             </div>
-          </div>
-        )}
-
-        {step === 'success' && (
-          <div className="mt-8 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-            <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Work Package Created Successfully!
-            </h3>
-            <p className="text-sm text-gray-600">
-              Redirecting to work package...
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Work Package from CSV</h2>
+            <p className="text-gray-600 mb-6">
+              Upload a CSV file with phases and deliverables to automatically generate your work package.
             </p>
+
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <button
+                onClick={handleDownloadTemplate}
+                className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Download CSV Template
+              </button>
+              <label className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Upload CSV File
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {file && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm text-green-800">
+                  <strong>Selected:</strong> {file.name}
+                </p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -338,4 +409,3 @@ export default function WorkPackageCSVUploadPage() {
     </Suspense>
   );
 }
-
