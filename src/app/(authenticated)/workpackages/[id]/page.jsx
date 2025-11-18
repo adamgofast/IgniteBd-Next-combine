@@ -298,6 +298,45 @@ export default function WorkPackagePage() {
  * Owner View - Full editing mode with all internal fields
  */
 function OwnerView({ workPackage, workPackageId }) {
+  const router = useRouter();
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionValue, setDescriptionValue] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
+
+  // Initialize description value
+  useEffect(() => {
+    if (workPackage?.description !== undefined && !editingDescription) {
+      setDescriptionValue(workPackage.description || '');
+    }
+  }, [workPackage?.description, editingDescription]);
+
+  const handleSaveDescription = async () => {
+    try {
+      setSavingDescription(true);
+      const response = await api.patch(`/api/workpackages/${workPackageId}`, {
+        description: descriptionValue.trim() || null,
+      });
+
+      if (response.data?.success) {
+        // Reload the page to get updated data
+        router.refresh();
+        setEditingDescription(false);
+      } else {
+        alert('Failed to update description: ' + (response.data?.error || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Error updating description:', err);
+      alert('Failed to update description: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleCancelEditDescription = () => {
+    setDescriptionValue(workPackage?.description || '');
+    setEditingDescription(false);
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
@@ -326,8 +365,59 @@ function OwnerView({ workPackage, workPackageId }) {
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            {workPackage.description && (
-              <p className="text-gray-600 mb-4">{workPackage.description}</p>
+            {editingDescription ? (
+              <div className="mb-4">
+                <textarea
+                  value={descriptionValue}
+                  onChange={(e) => setDescriptionValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      handleSaveDescription();
+                    } else if (e.key === 'Escape') {
+                      handleCancelEditDescription();
+                    }
+                  }}
+                  placeholder="Add a description..."
+                  rows={4}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-600 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  autoFocus
+                  disabled={savingDescription}
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={handleSaveDescription}
+                    disabled={savingDescription}
+                    className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingDescription ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancelEditDescription}
+                    disabled={savingDescription}
+                    className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <X className="h-4 w-4" />
+                    Cancel
+                  </button>
+                  <span className="text-xs text-gray-500">Press Ctrl+Enter to save, Esc to cancel</span>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 flex items-start gap-2">
+                {workPackage.description ? (
+                  <p className="text-gray-600 flex-1">{workPackage.description}</p>
+                ) : (
+                  <p className="text-gray-400 italic flex-1">No description</p>
+                )}
+                <button
+                  onClick={() => setEditingDescription(true)}
+                  className="text-gray-400 hover:text-gray-600 transition flex-shrink-0"
+                  title="Edit description"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+              </div>
             )}
             <div className="flex items-center gap-6 text-sm">
               {workPackage.totalCost && (
