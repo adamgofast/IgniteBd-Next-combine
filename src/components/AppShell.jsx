@@ -25,6 +25,7 @@ const ROUTES_WITH_SIDEBAR = [
   '/settings',
   '/client-operations',
   '/workpackages',
+  '/billing',
 ];
 
 // Public routes that should NOT show navigation

@@ -508,6 +508,7 @@ model WorkPackage {
 
   phases            WorkPackagePhase[]
   items             WorkPackageItem[]
+  invoices          Invoice[] // Invoices linked to this work package
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -801,4 +802,92 @@ model CompanyMembership {
   @@index([companyHqId])
   @@index([userId, companyHqId])
   @@map("company_memberships")
+}
+
+// ============================================
+// BILLING MODELS
+// ============================================
+
+model Invoice {
+  id                String   @id @default(cuid())
+  workPackageId     String
+  workPackage       WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  invoiceName       String
+  invoiceDescription String?
+  totalExpected     Int       @default(0)
+  totalReceived     Int       @default(0)
+  status            String    @default("pending") // "pending" | "partial" | "paid"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  milestones        InvoiceMilestone[]
+  payments          Payment[]
+
+  @@index([workPackageId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceMilestone {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  label          String
+  expectedAmount Int
+  expectedDate   DateTime?
+  description    String?
+  status         String   @default("pending") // "pending" | "paid"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  payments       Payment[] @relation("PaymentMilestone")
+
+  @@index([invoiceId])
+  @@index([status])
+  @@map("invoice_milestones")
+}
+
+model Payment {
+  id                     String  @id @default(cuid())
+  invoiceId              String
+  invoice                Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  milestoneId            String?
+  milestone              InvoiceMilestone? @relation("PaymentMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
+  amountReceived         Int
+  currency               String  @default("USD")
+  paidAt                 DateTime
+  stripeSessionId        String? @unique
+  stripePaymentIntentId  String? @unique
+  paidByContactId        String?
+  createdAt              DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([milestoneId])
+  @@index([stripeSessionId])
+  @@index([stripePaymentIntentId])
+  @@map("payments")
+}
+
+model InvoiceTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  milestones InvoiceTemplateMilestone[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("invoice_templates")
+}
+
+model InvoiceTemplateMilestone {
+  id               String   @id @default(cuid())
+  templateId       String
+  template         InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label            String
+  expectedAmount   Float
+  expectedDate     DateTime?
+  description      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([templateId])
+  @@map("invoice_template_milestones")
 }
