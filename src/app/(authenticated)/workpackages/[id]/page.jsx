@@ -6,7 +6,7 @@ import { ArrowLeft, Plus, Package, Eye, EyeOff, Mail, Edit, Trash2, Save, X } fr
 import api from '@/lib/api';
 import Link from 'next/link';
 import { getItemTypeLabel } from '@/lib/config/workPackageConfig';
-import { buildItemRoute, getRouteForItem } from '@/lib/services/workPackageLabelRouter';
+import { buildItemRoute } from '@/lib/services/workPackageLabelRouter';
 import { getTimelineStatusColor } from '@/lib/utils/workPackageTimeline';
 import { useWorkPackageHydration } from '@/hooks/useWorkPackageHydration';
 
@@ -372,7 +372,7 @@ function OwnerView({ workPackage, workPackageId }) {
 
   // Handle item click with label routing
   const handleItemClick = (item) => {
-    const route = buildItemRoute(item);
+    const route = buildItemRoute(item, workPackageId);
     if (route) {
       router.push(route);
     } else {
@@ -530,7 +530,7 @@ function OwnerView({ workPackage, workPackageId }) {
                 <div className="space-y-3">
                   {phase.items.map((item) => {
                     const progress = getProgressForItem(item);
-                    const itemRoute = buildItemRoute(item);
+                    const itemRoute = buildItemRoute(item, workPackageId);
                     const hasRoute = !!itemRoute;
                     return (
                       <div
@@ -638,7 +638,7 @@ function OwnerView({ workPackage, workPackageId }) {
               .filter(item => !item.workPackagePhaseId)
               .map((item) => {
                 const progress = getProgressForItem(item);
-                const itemRoute = buildItemRoute(item);
+                const itemRoute = buildItemRoute(item, workPackageId);
                 const hasRoute = !!itemRoute;
                 return (
                   <div
