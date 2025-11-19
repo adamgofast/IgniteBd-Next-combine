@@ -6,6 +6,9 @@ import { ArrowLeft, Plus, Package, Eye, EyeOff, Mail, Edit, Trash2, Save, X } fr
 import api from '@/lib/api';
 import Link from 'next/link';
 import { getItemTypeLabel } from '@/lib/config/workPackageConfig';
+import { buildItemRoute, getRouteForItem } from '@/lib/services/workPackageLabelRouter';
+import { getTimelineStatusColor } from '@/lib/utils/workPackageTimeline';
+import { useWorkPackageHydration } from '@/hooks/useWorkPackageHydration';
 
 /**
  * WorkPackage Detail Page
@@ -16,20 +19,14 @@ export default function WorkPackagePage() {
   const router = useRouter();
   const workPackageId = params.id;
   
-  const [workPackage, setWorkPackage] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState('owner'); // 'owner' | 'client'
   const [sendingEmail, setSendingEmail] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const [savingTitle, setSavingTitle] = useState(false);
 
-  useEffect(() => {
-    if (workPackageId) {
-      loadWorkPackage();
-    }
-  }, [workPackageId]);
+  // Use the new hydration hook for Owner App (includes timeline calculations)
+  const { workPackage, loading, error: hydrationError, refresh } = useWorkPackageHydration(workPackageId);
 
   // Update title value when workPackage changes
   useEffect(() => {
@@ -38,23 +35,6 @@ export default function WorkPackagePage() {
     }
   }, [workPackage?.title, editingTitle]);
 
-  const loadWorkPackage = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/api/workpackages/${workPackageId}`);
-      if (response.data?.success) {
-        setWorkPackage(response.data.workPackage);
-        setTitleValue(response.data.workPackage.title || '');
-      } else {
-        setError('Failed to load work package');
-      }
-    } catch (err) {
-      console.error('Error loading work package:', err);
-      setError('Failed to load work package');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveTitle = async () => {
     if (!titleValue.trim()) {
@@ -151,12 +131,18 @@ export default function WorkPackagePage() {
     );
   }
 
-  if (error || !workPackage) {
+  if (hydrationError || !workPackage) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-6xl px-4">
           <div className="rounded-2xl bg-white p-8 text-center shadow">
-            <p className="text-sm font-semibold text-red-600">{error || 'Work package not found'}</p>
+            <p className="text-sm font-semibold text-red-600">{hydrationError || 'Work package not found'}</p>
+            <button
+              onClick={() => refresh()}
+              className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </div>
@@ -359,6 +345,42 @@ function OwnerView({ workPackage, workPackageId }) {
     return sum + (phase.totalEstimatedHours || 0);
   }, 0) || 0;
 
+  // Calculate item statistics (reuse client-side logic)
+  const getAllItems = () => {
+    const phaseItems = workPackage.phases?.flatMap((phase) => phase.items || []) || [];
+    const directItems = workPackage.items?.filter((item) => !item.workPackagePhaseId) || [];
+    return [...phaseItems, ...directItems];
+  };
+
+  const calculateItemStats = () => {
+    const allItems = getAllItems();
+    const totalItems = allItems.length;
+    const completedItems = allItems.filter(
+      (item) => item.status === 'completed' || (item.progress?.completed >= item.progress?.total)
+    ).length;
+    const inProgress = allItems.filter((item) => item.status === 'in_progress').length;
+    const needsReview = allItems.filter((item) => {
+      // Items that have artifacts but status is not completed
+      const hasArtifacts = (item.artifacts?.length || item.collateral?.length || 0) > 0;
+      return hasArtifacts && item.status !== 'completed';
+    }).length;
+
+    return { totalItems, completedItems, inProgress, needsReview };
+  };
+
+  const itemStats = calculateItemStats();
+
+  // Handle item click with label routing
+  const handleItemClick = (item) => {
+    const route = buildItemRoute(item);
+    if (route) {
+      router.push(route);
+    } else {
+      // Fallback to default view if no route mapping
+      router.push(`/workpackages/${workPackageId}/items/${item.id}`);
+    }
+  };
+
   return (
     <>
       {/* Work Package Header */}
@@ -437,6 +459,27 @@ function OwnerView({ workPackage, workPackageId }) {
                 </div>
               )}
             </div>
+            {/* Item Statistics */}
+            <div className="mt-4 flex items-center gap-6 text-sm">
+              <div>
+                <span className="text-gray-500">Total Items: </span>
+                <span className="font-semibold text-gray-900">{itemStats.totalItems}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Completed: </span>
+                <span className="font-semibold text-green-600">{itemStats.completedItems}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">In Progress: </span>
+                <span className="font-semibold text-blue-600">{itemStats.inProgress}</span>
+              </div>
+              {itemStats.needsReview > 0 && (
+                <div>
+                  <span className="text-gray-500">Needs Review: </span>
+                  <span className="font-semibold text-yellow-600">{itemStats.needsReview}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -452,15 +495,34 @@ function OwnerView({ workPackage, workPackageId }) {
                   {phase.description && (
                     <p className="mt-1 text-sm text-gray-600">{phase.description}</p>
                   )}
-                  {phase.totalEstimatedHours && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Estimated Hours: {phase.totalEstimatedHours}
-                    </p>
-                  )}
+                  <div className="mt-2 flex items-center gap-4 text-xs">
+                    {phase.totalEstimatedHours && (
+                      <span className="text-gray-500">
+                        Estimated Hours: <span className="font-semibold">{phase.totalEstimatedHours}</span>
+                      </span>
+                    )}
+                    {phase.expectedEndDate && (
+                      <span className="text-gray-500">
+                        Expected End: <span className="font-semibold">
+                          {new Date(phase.expectedEndDate).toLocaleDateString()}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                  Position {phase.position}
-                </span>
+                <div className="flex items-center gap-2">
+                  {phase.timelineStatus && (
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getTimelineStatusColor(phase.timelineStatus)}`}>
+                      {phase.timelineStatus === 'complete' ? '✓ Complete' :
+                       phase.timelineStatus === 'overdue' ? '⚠ Overdue' :
+                       phase.timelineStatus === 'warning' ? '⚠ Warning' :
+                       '✓ On Track'}
+                    </span>
+                  )}
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    Position {phase.position}
+                  </span>
+                </div>
               </div>
 
               {/* Items in Phase */}
@@ -468,10 +530,15 @@ function OwnerView({ workPackage, workPackageId }) {
                 <div className="space-y-3">
                   {phase.items.map((item) => {
                     const progress = getProgressForItem(item);
+                    const itemRoute = buildItemRoute(item);
+                    const hasRoute = !!itemRoute;
                     return (
                       <div
                         key={item.id}
-                        className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                        className={`rounded-lg border border-gray-200 bg-gray-50 p-4 ${
+                          hasRoute ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''
+                        }`}
+                        onClick={hasRoute ? () => handleItemClick(item) : undefined}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -521,19 +588,18 @@ function OwnerView({ workPackage, workPackageId }) {
                             )}
                           </div>
                           <div className="ml-4 flex items-center gap-2">
-                            <Link
-                              href={`/workpackages/${workPackageId}/items/${item.id}`}
-                              className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </Link>
-                            <button
-                              className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              <Edit className="h-4 w-4" />
-                              Edit
-                            </button>
+                            {hasRoute ? (
+                              <span className="text-xs text-gray-500">Click to open</span>
+                            ) : (
+                              <Link
+                                href={`/workpackages/${workPackageId}/items/${item.id}`}
+                                className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Link>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -572,10 +638,15 @@ function OwnerView({ workPackage, workPackageId }) {
               .filter(item => !item.workPackagePhaseId)
               .map((item) => {
                 const progress = getProgressForItem(item);
+                const itemRoute = buildItemRoute(item);
+                const hasRoute = !!itemRoute;
                 return (
                   <div
                     key={item.id}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                    className={`rounded-lg border border-gray-200 bg-gray-50 p-4 ${
+                      hasRoute ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''
+                    }`}
+                    onClick={hasRoute ? () => handleItemClick(item) : undefined}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -609,13 +680,18 @@ function OwnerView({ workPackage, workPackageId }) {
                           </span>
                         </div>
                       </div>
-                      <Link
-                        href={`/workpackages/${workPackageId}/items/${item.id}`}
-                        className="ml-4 flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Link>
+                      {hasRoute ? (
+                        <span className="ml-4 text-xs text-gray-500">Click to open</span>
+                      ) : (
+                        <Link
+                          href={`/workpackages/${workPackageId}/items/${item.id}`}
+                          className="ml-4 flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );

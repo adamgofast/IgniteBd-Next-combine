@@ -503,6 +503,7 @@ model WorkPackage {
 
   title             String   // Proposal/work package title
   description       String?  // Proposal description
+  prioritySummary   String?  // Consultant-written summary of key focuses
   totalCost         Float?   // Total cost from proposal
   effectiveStartDate DateTime? // Optional timeline start date
 

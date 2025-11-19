@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ContactSelector from '@/components/ContactSelector';
 import { WORK_PACKAGE_ITEM_TYPES } from '@/lib/config/workPackageConfig';
 import PageHeader from '@/components/PageHeader';
@@ -69,11 +69,23 @@ const DELIVERABLE_TYPE_CONFIG = {
 
 export default function CreateDeliverablesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedContact, setSelectedContact] = useState(null);
   const [selectedWorkPackage, setSelectedWorkPackage] = useState(null);
   const [workPackages, setWorkPackages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingWorkPackages, setLoadingWorkPackages] = useState(false);
+
+  // Initialize from query params if provided
+  useEffect(() => {
+    const contactId = searchParams.get('contactId');
+    const workPackageId = searchParams.get('workPackageId');
+
+    if (contactId) {
+      // Load contact and work packages
+      loadContactAndWorkPackages(contactId, workPackageId);
+    }
+  }, [searchParams]);
 
   // Load workpackages when contact is selected
   useEffect(() => {
@@ -84,6 +96,34 @@ export default function CreateDeliverablesPage() {
       setSelectedWorkPackage(null);
     }
   }, [selectedContact]);
+
+  const loadContactAndWorkPackages = async (contactId, workPackageId) => {
+    try {
+      // Load contact
+      const contactResponse = await api.get(`/api/contacts/${contactId}`);
+      if (contactResponse.data?.success && contactResponse.data.contact) {
+        setSelectedContact(contactResponse.data.contact);
+      }
+
+      // Load work packages
+      const wpResponse = await api.get(`/api/workpackages?contactId=${contactId}`);
+      if (wpResponse.data?.success && wpResponse.data.workPackages) {
+        setWorkPackages(wpResponse.data.workPackages);
+        
+        // Pre-select work package if provided
+        if (workPackageId) {
+          const wp = wpResponse.data.workPackages.find((wp) => wp.id === workPackageId);
+          if (wp) {
+            setSelectedWorkPackage(wp);
+          }
+        } else if (wpResponse.data.workPackages.length === 1) {
+          setSelectedWorkPackage(wpResponse.data.workPackages[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading contact/work packages:', error);
+    }
+  };
 
   const loadWorkPackages = async (contactId) => {
     try {

@@ -123,7 +123,7 @@ export async function PATCH(request, { params }) {
 
     // Get update data from request body
     const body = await request.json();
-    const { title, description, totalCost, effectiveStartDate } = body;
+    const { title, description, totalCost, effectiveStartDate, prioritySummary } = body;
 
     // Build update data object (only include fields that are provided)
     const updateData = {};
@@ -133,6 +133,7 @@ export async function PATCH(request, { params }) {
     if (effectiveStartDate !== undefined) {
       updateData.effectiveStartDate = effectiveStartDate ? new Date(effectiveStartDate) : null;
     }
+    if (prioritySummary !== undefined) updateData.prioritySummary = prioritySummary;
 
     // Update the work package
     const workPackage = await prisma.workPackage.update({
