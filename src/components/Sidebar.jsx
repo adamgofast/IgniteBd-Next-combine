@@ -25,6 +25,7 @@ import {
   Box,
   Layers,
   Receipt,
+  PlayCircle,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -78,7 +79,7 @@ const navigationGroups = [
       { name: 'Proposal Templates', path: '/templates', icon: Layers },
       { name: 'Proposals', path: '/client-operations/proposals', icon: FileCheck },
       { name: 'Work Packages', path: '/workpackages', icon: Box },
-      { name: 'Execution Hub', path: '/client-operations/execution', icon: Settings },
+      { name: 'Execution Hub', path: '/client-operations/execution', icon: PlayCircle },
       { name: 'Create Deliverables', path: '/client-operations/create-deliverables', icon: FileText },
       { name: 'Billing', path: '/billing', icon: Receipt },
       { name: 'Initiate Client Journey', path: '/client-operations', icon: Rocket, exact: true },
