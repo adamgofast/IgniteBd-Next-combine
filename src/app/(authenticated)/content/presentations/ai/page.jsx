@@ -101,9 +101,24 @@ export default function AIPresentationBuilderPage() {
                 type="number"
                 value={slideCount}
                 onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow typing (including empty for deletion)
+                  if (value === '') {
+                    setSlideCount(6); // Default if cleared
+                  } else {
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue) && numValue >= 1 && numValue <= 100) {
+                      setSlideCount(numValue);
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  // Ensure valid value on blur
                   const value = parseInt(e.target.value, 10);
-                  if (!isNaN(value) && value >= 1) {
-                    setSlideCount(value);
+                  if (isNaN(value) || value < 1) {
+                    setSlideCount(6);
+                  } else if (value > 100) {
+                    setSlideCount(100);
                   }
                 }}
                 min={1}
