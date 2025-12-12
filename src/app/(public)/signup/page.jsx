@@ -42,9 +42,10 @@ export default function SignupPage() {
 
       localStorage.setItem('firebaseId', result.uid);
       localStorage.setItem('adminId', owner.id);
+      localStorage.setItem('ownerId', owner.id);
       localStorage.setItem('email', owner.email || result.email);
 
-      router.push('/owner-identity-survey');
+      router.push('/profilesetup');
     } catch (error) {
       console.error('Google signup failed:', error);
       alert('Signup failed. Please try again.');
@@ -82,9 +83,10 @@ export default function SignupPage() {
 
       localStorage.setItem('firebaseId', result.uid);
       localStorage.setItem('adminId', owner.id);
+      localStorage.setItem('ownerId', owner.id);
       localStorage.setItem('email', owner.email || result.email);
 
-      router.push('/owner-identity-survey');
+      router.push('/profilesetup');
     } catch (error) {
       console.error('Email signup failed:', error);
       alert('Signup failed. Please try again.');

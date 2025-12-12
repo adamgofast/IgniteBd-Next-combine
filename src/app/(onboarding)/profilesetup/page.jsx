@@ -2,16 +2,38 @@
 
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAuth } from 'firebase/auth';
 import api from '@/lib/api';
+import { inferCompanyNameFromEmail, inferWebsiteFromEmail } from '@/lib/services/CompanyEnrichmentService';
+import { useOwner } from '@/hooks/useOwner';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
+  const { owner, companyHQId, refresh } = useOwner();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
   });
   const [loading, setLoading] = useState(false);
+
+  // Pre-fill form if owner data is available
+  useEffect(() => {
+    if (owner?.name) {
+      const nameParts = owner.name.split(' ');
+      if (nameParts.length >= 2) {
+        setFormData({
+          firstName: nameParts[0],
+          lastName: nameParts.slice(1).join(' '),
+        });
+      } else if (nameParts.length === 1) {
+        setFormData({
+          firstName: nameParts[0],
+          lastName: '',
+        });
+      }
+    }
+  }, [owner]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -38,13 +60,61 @@ export default function ProfileSetupPage() {
 
       const name = `${formData.firstName} ${formData.lastName}`.trim();
 
+      // Update profile
       await api.put(`/api/owner/${ownerId}/profile`, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         name,
       });
 
-      router.push('/company/create-or-choose');
+      // Refresh owner data
+      await refresh();
+
+      // Check if company exists (check localStorage after refresh)
+      const existingCompanyId = localStorage.getItem('companyHQId');
+      
+      if (!existingCompanyId) {
+        const firebaseUser = getAuth().currentUser;
+        // Get fresh owner data from localStorage after refresh
+        const storedOwner = localStorage.getItem('owner');
+        const currentOwner = storedOwner ? JSON.parse(storedOwner) : owner;
+        const ownerEmail = currentOwner?.email || firebaseUser?.email;
+        const ownerName = name || currentOwner?.name || '';
+
+        // Infer company name from email if available
+        let inferredCompanyName = 'My Company';
+        if (ownerEmail) {
+          inferredCompanyName = inferCompanyNameFromEmail(ownerEmail) || 'My Company';
+        }
+        if (inferredCompanyName === 'My Company' && ownerName) {
+          inferredCompanyName = `${ownerName}'s Company`;
+        }
+
+        // Infer website from email
+        const inferredWebsite = ownerEmail ? inferWebsiteFromEmail(ownerEmail) : null;
+
+        // Create company using upsert endpoint
+        const companyData = {
+          companyName: inferredCompanyName,
+          whatYouDo: 'Business development and growth services',
+          companyWebsite: inferredWebsite || null,
+          teamSize: 'just-me',
+        };
+
+        const companyResponse = await api.put('/api/company/upsert', companyData);
+        
+        if (companyResponse.data?.success && companyResponse.data?.companyHQ) {
+          const companyHQ = companyResponse.data.companyHQ;
+          localStorage.setItem('companyHQId', companyHQ.id);
+          localStorage.setItem('companyHQ', JSON.stringify(companyHQ));
+        }
+      }
+
+      // Refresh owner data one more time
+      await refresh();
+
+      // Redirect to dashboard
+      router.push('/growth-dashboard');
     } catch (error) {
       console.error('Profile setup error:', error);
       alert('Profile setup failed. Please try again.');
@@ -115,19 +185,11 @@ export default function ProfileSetupPage() {
 
             <div className="flex gap-4 pt-6">
               <button
-                type="button"
-                onClick={() => router.push('/signin')}
-                className="flex-1 px-6 py-3 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-all"
-              >
-                Back
-              </button>
-
-              <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Setting up…' : 'Complete Setup →'}
+                {loading ? 'Setting up…' : 'Continue →'}
               </button>
             </div>
           </form>

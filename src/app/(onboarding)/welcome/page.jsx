@@ -2,42 +2,56 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useOwner } from '@/hooks/useOwner';
 
 export default function WelcomePage() {
   const router = useRouter();
   const { ownerId, owner, companyHQId, loading, hydrated, error, refresh } = useOwner();
   const [nextRoute, setNextRoute] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Refresh from API if not hydrated
+  // Wait for Firebase auth to initialize and check auth state
   useEffect(() => {
-    if (!hydrated && !loading) {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        // Check if we have ownerId in localStorage (might be from previous session)
+        const storedOwnerId = localStorage.getItem('ownerId') || localStorage.getItem('adminId');
+        if (!storedOwnerId) {
+          router.replace('/signup');
+          return;
+        }
+      }
+      setAuthChecked(true);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  // Refresh from API if not hydrated and auth is checked
+  useEffect(() => {
+    if (authChecked && !hydrated && !loading) {
       const timer = setTimeout(() => {
         refresh();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [hydrated, loading, refresh]);
-
-  // Check Firebase auth
-  useEffect(() => {
-    const firebaseUser = getAuth().currentUser;
-    if (!firebaseUser) {
-      router.replace('/signup');
-    }
-  }, [router]);
+  }, [authChecked, hydrated, loading, refresh]);
 
   // Determine next route based on hydration
   useEffect(() => {
-    if (!hydrated || loading) return;
+    if (!authChecked || !hydrated || loading) return;
 
-    if (!companyHQId || !owner?.ownedCompanies?.length) {
-      setNextRoute('/company/create-or-choose');
+    // Check if owner has a company
+    const hasCompany = companyHQId || owner?.companyHQId || owner?.ownedCompanies?.length > 0;
+    
+    if (!hasCompany) {
+      setNextRoute('/profilesetup');
     } else {
       setNextRoute('/growth-dashboard');
     }
-  }, [hydrated, loading, companyHQId, owner]);
+  }, [authChecked, hydrated, loading, companyHQId, owner]);
 
   const handleContinue = () => {
     if (nextRoute) {
@@ -45,7 +59,7 @@ export default function WelcomePage() {
     }
   };
 
-  if (loading) {
+  if (!authChecked || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
         <div className="text-center">
@@ -75,7 +89,14 @@ export default function WelcomePage() {
   }
 
   if (!hydrated || !nextRoute) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-600 via-red-700 to-red-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mx-auto mb-4" />
+          <p className="text-white text-xl">Setting up your account...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
