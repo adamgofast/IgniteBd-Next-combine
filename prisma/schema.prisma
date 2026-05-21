@@ -8,200 +8,345 @@ datasource db {
 }
 
 model Owner {
-  id         String  @id @default(cuid())
-  firebaseId String  @unique
-  name       String?
-  email      String?
-  photoURL   String?
-  teamSize   String? // Team size for owner context (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-
-  // Microsoft OAuth integration (bolted directly onto Owner)
-  microsoftAccessToken  String? // Microsoft Graph access token
-  microsoftRefreshToken String? // Refresh token for getting new access tokens
-  microsoftExpiresAt    DateTime? // Token expiration timestamp
-  microsoftEmail        String? // Microsoft account email (for display)
-  microsoftDisplayName  String? // Microsoft account display name (for display)
-  microsoftTenantId     String? // Tenant ID extracted from ID token (for tenant-specific token refresh)
-
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  managedCompanies CompanyHQ[]     @relation("ManagerOf")
-  ownedCompanies   CompanyHQ[]     @relation("OwnerOf")
-  emailActivities  EmailActivity[] // Outreach email tracking
-  assessments      Assessment[] // Growth assessments
+  id                    String              @id @default(cuid())
+  firebaseId            String              @unique
+  name                  String?
+  email                 String?
+  photoURL              String?
+  teamSize              String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  firstName             String?
+  lastName              String?
+  sendgridVerifiedEmail String?
+  sendgridVerifiedName  String?
+  tier                  String?             @default("foundation")
+  GoogleOAuthToken      GoogleOAuthToken[]
+  Meeting               Meeting[]
+  MicrosoftAccount      MicrosoftAccount?
+  assessments           Assessment[]
+  campaigns             campaigns[]
+  managedCompanies      CompanyHQ[]         @relation("ManagerOf")
+  ownedCompanies        CompanyHQ[]         @relation("OwnerOf")
+  company_memberships   CompanyMembership[]
+  emailActivities       EmailActivity[]
+  email_sequences       email_sequences[]
+  email_signatures      email_signatures[]
+  templates             Template[]
 
   @@map("owners")
 }
 
 model EmailActivity {
-  id        String   @id @default(cuid())
-  ownerId   String   @map("owner_id")
-  contactId String?  @map("contact_id")
-  tenantId  String?  @map("tenant_id")
-  email     String
-  subject   String
-  body      String
-  event     String? // last known state: delivered, opened, clicked, bounced, etc.
-  messageId String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  owner Owner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                  String              @id @default(cuid())
+  ownerId             String              @map("owner_id")
+  contactId           String?             @map("contact_id")
+  tenantId            String?             @map("tenant_id")
+  email               String?
+  subject             String?
+  body                String?
+  event               String?
+  messageId           String?             @unique
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  campaign_id         String?
+  sequence_id         String?
+  sequence_step_id    String?
+  reply_to_message_id String?
+  source              EmailSource?        @default(PLATFORM)
+  platform            String?
+  sentAt              DateTime?
+  responseFromEmail   String?
+  emailSequenceOrder  EmailSequenceOrder?
+  emailRawText        String?
+  summary             String?
+  campaigns           campaigns?          @relation(fields: [campaign_id], references: [id])
+  owner               Owner               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  email_sequences     email_sequences?    @relation(fields: [sequence_id], references: [id])
+  sequence_steps      sequence_steps?     @relation(fields: [sequence_step_id], references: [id])
 
   @@index([ownerId])
   @@index([messageId])
   @@index([contactId])
+  @@index([campaign_id])
+  @@index([contactId, createdAt])
+  @@index([emailSequenceOrder])
+  @@index([responseFromEmail])
+  @@index([sentAt])
+  @@index([sequence_id])
+  @@index([source])
   @@map("email_activities")
 }
 
 model CompanyHQ {
-  id                   String                  @id @default(cuid())
-  companyName          String
-  companyStreet        String? // Street address
-  companyCity          String? // City
-  companyState         String? // State
-  companyWebsite       String? // Website URL (for LinkedIn extraction, etc.)
-  whatYouDo            String? // What the company does (description)
-  companyIndustry      String?
-  companyAnnualRev     Float?
-  yearsInBusiness      Int?
-  teamSize             String? // Team size for company (e.g., "just-me", "2-10", "11-50", "51-200", "200+")
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  ownerId              String? // Owner.id (for legacy Owner model) - optional for Contact-owned HQs
-  contactOwnerId       String? // Contact.id (for Contact-owned HQs) - when Contact becomes owner
-  managerId            String?
-  companies            Company[]
-  manager              Owner?                  @relation("ManagerOf", fields: [managerId], references: [id])
-  owner                Owner?                  @relation("OwnerOf", fields: [ownerId], references: [id]) // Made optional
-  contactOwner         Contact?                @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id]) // Contact who owns this HQ
-  contactLists         ContactList[]
-  contacts             Contact[]
-  proposals            Proposal[]
-  products             Product[]
-  personas             Persona[]
-  assessments          Assessment[]
-  memberships          CompanyMembership[] // Junction table for multi-HQ access
-  domainRegistry       DomainRegistry? // Domain registry entry (one-to-one)
-  deliverables         ConsultantDeliverable[] // Client delivery deliverables
-  phaseTemplates       PhaseTemplate[]
-  deliverableTemplates DeliverableTemplate[]
-  blogs                Blog[]
-  templates            Template[]
-  eventPlans           EventPlan[]
-  cleDecks             CleDeck[]
-  landingPages         LandingPage[]
-  presentations        Presentation[]
+  id                            String                          @id @default(cuid())
+  companyName                   String
+  companyStreet                 String?
+  companyCity                   String?
+  companyState                  String?
+  companyWebsite                String?
+  whatYouDo                     String?
+  companyIndustry               String?
+  teamSize                      String?
+  createdAt                     DateTime                        @default(now())
+  updatedAt                     DateTime                        @updatedAt
+  ownerId                       String?
+  contactOwnerId                String?
+  managerId                     String?
+  companyAnnualRev              String?
+  yearsInBusiness               String?
+  tier                          String?
+  planEndedAt                   DateTime?
+  planId                        String?
+  planStartedAt                 DateTime?
+  planStatus                    PlatformAccessStatus?
+  platformId                    String?
+  stripeCustomerId              String?                         @unique
+  stripeSubscriptionId          String?                         @unique
+  companyZip                    String?
+  slug                          String?
+  InboundEmail                  InboundEmail[]
+  Meeting                       Meeting[]
+  RawMeetingNotes               RawMeetingNotes[]
+  assessments                   Assessment[]
+  bills                         bills[]
+  blogs                         Blog[]
+  campaigns                     campaigns[]
+  companies                     Company[]
+  contactOwner                  Contact?                        @relation("ContactOwnedHQs", fields: [contactOwnerId], references: [id])
+  manager                       Owner?                          @relation("ManagerOf", fields: [managerId], references: [id])
+  owner                         Owner?                          @relation("OwnerOf", fields: [ownerId], references: [id])
+  plans                         plans?                          @relation(fields: [planId], references: [id])
+  platform                      platform?                       @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  memberships                   CompanyMembership[]
+  deliverables                  ConsultantDeliverable[]
+  contactLists                  ContactList[]
+  contacts                      Contact[]
+  deliverableTemplates          DeliverableTemplate[]
+  domainRegistry                DomainRegistry?
+  email_sequences               email_sequences[]
+  invoice_settings              invoice_settings?
+  invoice_templates             InvoiceTemplate[]
+  invoices                      Invoice[]
+  landingPages                  LandingPage[]
+  personas                      Persona[]
+  phaseTemplates                PhaseTemplate[]
+  presentations                 Presentation[]
+  products                      Product[]
+  proposals                     Proposal[]
+  template_relationship_helpers template_relationship_helpers[]
+  template_variables            template_variables[]
+  templates                     Template[]
+  work_packages                 WorkPackage[]
 
+  @@index([planId])
+  @@index([planStatus])
+  @@index([platformId])
+  @@index([slug])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
   @@map("company_hqs")
 }
 
 model Company {
-  id              String        @id @default(cuid())
-  companyHQId     String
-  companyName     String
-  address         String?
-  industry        String?
-  website         String? // Website URL (inferred from email domain or manually entered)
-  revenue         Float?
-  yearsInBusiness Int?
-  proposalId      String?
-  contractId      String?
-  invoiceId       String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  companyHQ       CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contacts        Contact[]
-  proposals       Proposal[] // Proposals linked to this company
-  workPackages    WorkPackage[] // Work packages for this company
+  id                    String        @id @default(cuid())
+  companyHQId           String
+  companyName           String
+  address               String?
+  industry              String?
+  website               String?
+  revenue               Float?
+  yearsInBusiness       Int?
+  proposalId            String?
+  contractId            String?
+  invoiceId             String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  category              String?
+  companyHealthScore    Int?
+  competitors           String[]      @default([])
+  domain                String?       @unique
+  fundingStage          String?
+  growthRate            Float?
+  growthScore           Int?
+  headcount             Int?
+  headcountTier         String?
+  lastFundingAmount     Float?
+  lastFundingDate       DateTime?
+  marketPositionScore   Int?
+  normalizedIndustry    String?
+  numberOfFundingRounds Int?
+  positioningLabel      String?
+  readinessScore        Int?
+  revenueRange          String?
+  revenueTier           String?
+  stabilityScore        Int?
+  companyHQ             CompanyHQ     @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  contacts              Contact[]
+  invoices              Invoice[]
+  proposals             Proposal[]
+  workPackages          WorkPackage[]
 
+  @@index([domain])
   @@map("companies")
 }
 
 model ContactList {
-  id          String    @id @default(cuid())
-  companyId   String
-  name        String
-  description String?
-  type        String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  companyHQ   CompanyHQ @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contacts    Contact[]
+  id            String      @id @default(cuid())
+  companyId     String
+  name          String
+  description   String?
+  type          String      @default("static")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  filters       Json?
+  totalContacts Int         @default(0)
+  lastUpdated   DateTime    @default(now())
+  isActive      Boolean     @default(true)
+  campaigns     campaigns[]
+  companyHQ     CompanyHQ   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts      Contact[]
 
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([isActive])
   @@map("contact_lists")
 }
 
 model Contact {
-  id                  String    @id @default(cuid())
-  crmId               String // CompanyHQId (tenant identifier) - renamed from companyId for clarity
-  firstName           String?
-  lastName            String?
-  fullName            String? // Full name from enrichment
-  goesBy              String?
-  email               String?   @unique
-  phone               String?
-  title               String?
-  seniority           String? // Seniority level from enrichment
-  department          String? // Department from enrichment
-  linkedinUrl         String? // LinkedIn URL from enrichment
-  city                String? // City from enrichment
-  state               String? // State from enrichment
-  country             String? // Country from enrichment
-  contactCompanyId    String? // Company they work for (prospect/client company)
-  buyerDecision       String?
-  howMet              String?
-  notes               String? // Notes/context about the contact
-  contactListId       String?
-  domain              String? // Domain inferred from email (e.g., "businesspointlaw.com")
-  companyName         String? // Company name from enrichment
-  companyDomain       String? // Company domain from enrichment (e.g., "example.com")
-  enrichmentSource    String? // Source of enrichment (e.g., "Lusha", "Apollo")
-  enrichmentFetchedAt DateTime? // When enrichment was fetched
-  enrichmentPayload   Json? // Full enrichment payload
-  createdById         String? // User who created this contact
+  id                                                        String                   @id @default(cuid())
+  crmId                                                     String
+  firstName                                                 String?
+  lastName                                                  String?
+  fullName                                                  String?
+  goesBy                                                    String?
+  email                                                     String?
+  phone                                                     String?
+  title                                                     String?
+  seniority                                                 String?
+  department                                                String?
+  linkedinUrl                                               String?
+  city                                                      String?
+  state                                                     String?
+  country                                                   String?
+  companyName                                               String?
+  companyDomain                                             String?
+  contactCompanyId                                          String?
+  howMet                                                    String?
+  notes                                                     String?
+  contactListId                                             String?
+  domain                                                    String?
+  enrichmentSource                                          String?
+  enrichmentFetchedAt                                       DateTime?
+  enrichmentPayload                                         Json?
+  createdById                                               String?
+  firebaseUid                                               String?                  @unique
+  clientPortalUrl                                           String?                  @default("https://clientportal.ignitegrowth.biz")
+  isActivated                                               Boolean                  @default(false)
+  activatedAt                                               DateTime?
+  ownerId                                                   String?
+  role                                                      String                   @default("contact")
+  createdAt                                                 DateTime                 @default(now())
+  updatedAt                                                 DateTime                 @updatedAt
+  averageTenureMonths                                       Float?
+  avgTenureYears                                            Float?
+  budgetAuthority                                           Boolean?
+  buyerLikelihoodScore                                      Int?
+  buyingPowerScore                                          Int?
+  buyingTriggers                                            String[]                 @default([])
+  careerMomentumScore                                       Int?
+  careerProgression                                         String?
+  careerStabilityScore                                      Int?
+  careerTimeline                                            Json?
+  companyId                                                 String?
+  companyIndustry                                           String?
+  companySize                                               String?
+  currentRoleStartDate                                      DateTime?
+  currentTenureYears                                        Float?
+  decisionMaker                                             Boolean?
+  enrichmentRedisKey                                        String?
+  gatekeeper                                                Boolean?
+  goals                                                     String[]                 @default([])
+  influencer                                                Boolean?
+  jobRole                                                   String?
+  numberOfJobChanges                                        Int?
+  painPoints                                                String[]                 @default([])
+  profileSummary                                            String?
+  readinessToBuyScore                                       Int?
+  recentJobChange                                           Boolean?
+  recentPromotion                                           Boolean?
+  rolePowerScore                                            Int?
+  seniorityScore                                            Int?
+  tenureYears                                               Int?
+  timezone                                                  String?
+  totalExperienceYears                                      Float?
+  totalYearsExperience                                      Float?
+  urgencyScore                                              Int?
+  buyingReadiness                                           BuyingReadiness?
+  buyerPerson                                               BuyerPerson?
+  careerMomentum                                            String?
+  positionType                                              String?
+  whatTheyreLookingFor                                      String?
+  lastContact                                               String?
+  linkedinConnectedOn                                       String?
+  persona_type                                              PersonaType?
+  prior_relationship                                        RelationshipEnum?
+  outreachPersonaSlug                                       String?
+  nextContactedAt                                           DateTime?
+  nextContactNote                                           String?
+  introducedByContactId                                     String?
+  nextEngagementDate                                        String?
+  nextEngagementPurpose                                     NextEngagementPurpose?
+  contactDisposition                                        ContactDisposition?
+  pipelineSnap                                              String?
+  pipelineStageSnap                                         String?
+  outreachIntent                                            ContactOutreachIntent?   @default(PROSPECT)
+  lastEngagementDate                                        DateTime?
+  lastEngagementType                                        EngagementType?
+  contactSummary                                            String?
+  engagementSummary                                         String?
+  Meeting                                                   Meeting[]
+  ownedHQs                                                  CompanyHQ[]              @relation("ContactOwnedHQs")
+  deliverables                                              ConsultantDeliverable[]
+  contact_analyses                                          contact_analyses?
+  contact_engagement_log                                    contact_engagement_log[]
+  contactCompany                                            Company?                 @relation(fields: [contactCompanyId], references: [id])
+  contactList                                               ContactList?             @relation(fields: [contactListId], references: [id])
+  companyHQ                                                 CompanyHQ                @relation(fields: [crmId], references: [id])
+  outreach_personas                                         outreach_personas?       @relation(fields: [outreachPersonaSlug], references: [slug])
+  invites                                                   InviteToken[]
+  invoices                                                  Invoice[]
+  pipeline                                                  Pipeline?
+  proposals                                                 Proposal[]
+  relationship_contexts                                     relationship_contexts?
+  work_packages_work_packages_workPackageClientIdTocontacts WorkPackage[]            @relation("work_packages_workPackageClientIdTocontacts")
+  work_packages_work_packages_workPackageMemberIdTocontacts WorkPackage[]            @relation("work_packages_workPackageMemberIdTocontacts")
 
-  // Client Portal Activation
-  firebaseUid     String?   @unique // Firebase Auth UID
-  clientPortalUrl String?   @default("https://clientportal.ignitegrowth.biz") // Portal URL for this contact
-  isActivated     Boolean   @default(false) // Has completed activation flow
-  activatedAt     DateTime? // When activation was completed
-
-  // Elevation to Owner
-  ownerId String? // Contact.id (self-reference when they become owner of their own HQ)
-  role    String  @default("contact") // "contact" | "owner"
-
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  companyHQ      CompanyHQ               @relation(fields: [crmId], references: [id])
-  contactCompany Company?                @relation(fields: [contactCompanyId], references: [id])
-  contactList    ContactList?            @relation(fields: [contactListId], references: [id])
-  pipeline       Pipeline?
-  deliverables   ConsultantDeliverable[]
-  invites        InviteToken[] // Invite tokens for activation
-  ownedHQs       CompanyHQ[]             @relation("ContactOwnedHQs") // HQs owned by this Contact
-  proposals      Proposal[] // Proposals for this contact
-  workPackages   WorkPackage[] // Work packages for this contact
-  // Note: memberships are queried via firebaseUid, not direct relation (due to nullable firebaseUid)
-
+  @@unique([email, crmId])
   @@index([email])
   @@index([firebaseUid])
   @@index([ownerId])
   @@index([role])
   @@index([domain])
+  @@index([companyDomain])
+  @@index([companyId])
+  @@index([contactDisposition])
+  @@index([lastEngagementDate])
+  @@index([nextContactedAt])
+  @@index([nextEngagementDate])
+  @@index([outreachIntent])
   @@map("contacts")
 }
 
 model DomainRegistry {
-  id              String   @id @default(cuid())
-  domain          String   @unique // Normalized domain (e.g., "businesspointlaw.com")
-  normalizedName  String? // Normalized company name (e.g., "Business Point Law")
-  companyHqId     String   @unique // CompanyHQ this domain belongs to
-  firstSeen       DateTime @default(now())
-  lastSeen        DateTime @updatedAt
-  confidenceScore Float?   @default(1.0) // Confidence that this domain belongs to this CompanyHQ
-
-  companyHQ CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  domain          String    @unique
+  normalizedName  String?
+  companyHqId     String    @unique
+  firstSeen       DateTime  @default(now())
+  lastSeen        DateTime  @updatedAt
+  confidenceScore Float?    @default(1.0)
+  companyHQ       CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
 
   @@index([domain])
   @@index([companyHqId])
@@ -214,21 +359,21 @@ model Product {
   name                  String
   description           String?
   valueProp             String?
-  price                 Float? // Price in base currency
-  priceCurrency         String?      @default("USD") // Currency code (USD, EUR, etc.)
-  pricingModel          String? // one-time, recurring, usage-based, freemium, custom
-  category              String? // Category or type of product/service
-  deliveryTimeline      String? // How long it takes to deliver
-  targetMarketSize      String? // enterprise, mid-market, small-business, startup, individual
-  salesCycleLength      String? // immediate, short, medium, long, very-long
-  features              String? // Key features (free text)
-  competitiveAdvantages String? // Competitive advantages (free text)
-  targetedTo            String? // Persona ID that this product is targeted to
+  price                 Float?
+  priceCurrency         String?      @default("USD")
+  pricingModel          String?
+  category              String?
+  deliveryTimeline      String?
+  targetMarketSize      String?
+  salesCycleLength      String?
+  features              String?
+  competitiveAdvantages String?
+  targetedTo            String?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
-  companyHQ             CompanyHQ    @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   personas              Persona[]
   productFits           ProductFit[]
+  companyHQ             CompanyHQ    @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@map("products")
 }
@@ -237,7 +382,7 @@ model Pipeline {
   id        String   @id @default(cuid())
   contactId String   @unique
   pipeline  String
-  stage     String
+  stage     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -246,37 +391,28 @@ model Pipeline {
 }
 
 model Proposal {
-  id          String    @id @default(cuid())
-  title       String
-  companyHQId String // Multi-tenancy - scoped to CompanyHQ (hqId)
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-
-  // Client information
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  // Proposal details
-  estimatedStart DateTime
-  status         String   @default("draft") // "draft" | "active" | "approved" | "rejected"
-  totalPrice     Float?
-  purpose        String? // Purpose/description of the proposal
-
-  // Legacy JSON fields (for backward compatibility during migration)
-  phases       Json? // DEPRECATED: Use ProposalPhase relation instead
-  milestones   Json? // DEPRECATED
-  compensation Json? // Compensation object (total, currency, breakdown, paymentSchedule)
-
-  // Metadata
-  dateIssued DateTime?
-  preparedBy String?
-
+  id                   String                  @id @default(cuid())
+  title                String
+  companyHQId          String
+  contactId            String
+  companyId            String
+  estimatedStart       DateTime
+  status               String                  @default("draft")
+  totalPrice           Float?
+  purpose              String?
+  phases               Json?
+  milestones           Json?
+  compensation         Json?
+  dateIssued           DateTime?
+  preparedBy           String?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
-  proposalPhases       ProposalPhase[]
   deliverables         ConsultantDeliverable[]
-  proposalDeliverables ProposalDeliverable[] // Detached line items (no template links)
+  proposalDeliverables ProposalDeliverable[]
+  proposalPhases       ProposalPhase[]
+  companyHQ            CompanyHQ               @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  company              Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact              Contact                 @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@map("proposals")
 }
@@ -284,11 +420,11 @@ model Proposal {
 model PhaseTemplate {
   id                        String                     @id @default(cuid())
   companyHQId               String
-  companyHQ                 CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   name                      String
   description               String?
   createdAt                 DateTime                   @default(now())
   phaseDeliverableTemplates PhaseDeliverableTemplate[]
+  companyHQ                 CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   proposalPhases            ProposalPhase[]
 
   @@unique([companyHQId, name])
@@ -299,14 +435,13 @@ model PhaseTemplate {
 model DeliverableTemplate {
   id                        String                     @id @default(cuid())
   companyHQId               String
-  companyHQ                 CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   deliverableType           String
   deliverableLabel          String
-  defaultUnitOfMeasure      String // "day" | "week" | "month"
-  defaultDuration           Int // duration in the above unit
+  defaultUnitOfMeasure      String
+  defaultDuration           Int
   createdAt                 DateTime                   @default(now())
+  companyHQ                 CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   phaseDeliverableTemplates PhaseDeliverableTemplate[]
-  // NO link to ProposalDeliverable - it's a detached copy
 
   @@unique([companyHQId, deliverableType])
   @@index([companyHQId])
@@ -317,11 +452,11 @@ model PhaseDeliverableTemplate {
   id                    String              @id @default(cuid())
   phaseTemplateId       String
   deliverableTemplateId String
-  phaseTemplate         PhaseTemplate       @relation(fields: [phaseTemplateId], references: [id], onDelete: Cascade)
-  deliverableTemplate   DeliverableTemplate @relation(fields: [deliverableTemplateId], references: [id], onDelete: Cascade)
   defaultQuantity       Int?                @default(1)
   order                 Int?                @default(0)
   createdAt             DateTime            @default(now())
+  deliverableTemplate   DeliverableTemplate @relation(fields: [deliverableTemplateId], references: [id], onDelete: Cascade)
+  phaseTemplate         PhaseTemplate       @relation(fields: [phaseTemplateId], references: [id], onDelete: Cascade)
 
   @@unique([phaseTemplateId, deliverableTemplateId])
   @@map("phase_deliverable_templates")
@@ -330,69 +465,68 @@ model PhaseDeliverableTemplate {
 model ProposalPhase {
   id              String         @id @default(cuid())
   proposalId      String
-  proposal        Proposal       @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   phaseTemplateId String?
-  phaseTemplate   PhaseTemplate? @relation(fields: [phaseTemplateId], references: [id], onDelete: SetNull)
   name            String
   description     String?
   durationWeeks   Int
   order           Int
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  // Removed deliverables relation - ProposalDeliverable is now at proposal level
+  phaseTemplate   PhaseTemplate? @relation(fields: [phaseTemplateId], references: [id])
+  proposal        Proposal       @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@index([proposalId])
   @@map("proposal_phases")
 }
 
 model ProposalDeliverable {
-  id         String   @id @default(cuid())
-  proposalId String
-  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-
-  // Detached copy fields (hydrated from template at creation, then standalone)
+  id          String   @id @default(cuid())
+  proposalId  String
   name        String
   description String?
-  quantity    Int     @default(1)
-
-  // Pricing fields
-  unitPrice  Float?
-  totalPrice Float? // quantity * unitPrice (can be overridden)
-  notes      String? // Additional notes per line item
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  quantity    Int      @default(1)
+  unitPrice   Float?
+  totalPrice  Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  proposal    Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@index([proposalId])
   @@map("proposal_deliverables")
 }
 
 model Persona {
-  id              String      @id @default(cuid())
-  companyHQId     String
-  personName      String
-  title           String
-  headline        String?
-  seniority       String?
-  industry        String?
-  subIndustries   String[]
-  company         String?
-  companySize     String?
-  annualRevenue   String?
-  location        String?
-  description     String?
-  whatTheyWant    String?
-  painPoints      String[]
-  risks           String[]
-  decisionDrivers String[]
-  buyerTriggers   String[]
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  companyHQ       CompanyHQ   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  productFit      ProductFit?
-  bdIntel         BdIntel?
-  product         Product?    @relation(fields: [productId], references: [id])
-  productId       String?
+  id                   String                 @id @default(cuid())
+  companyHQId          String
+  personName           String                 @default("")
+  title                String
+  headline             String?
+  seniority            String?
+  industry             String?
+  subIndustries        String[]
+  company              String?
+  companySize          String?
+  annualRevenue        String?
+  location             String?
+  description          String?
+  whatTheyWant         String?
+  painPoints           String[]
+  risks                String[]
+  decisionDrivers      String[]
+  buyerTriggers        String[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  productId            String?
+  coreGoal             String?
+  needForOurProduct    String?
+  potentialPitch       String?
+  role                 String?
+  bdIntel              BdIntel?
+  event_tuner_personas event_tuner_personas[]
+  companyHQ            CompanyHQ              @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  product              Product?               @relation(fields: [productId], references: [id])
+  productFit           ProductFit?
 
   @@map("personas")
 }
@@ -414,13 +548,13 @@ model ProductFit {
 model BdIntel {
   id                    String   @id @default(cuid())
   personaId             String   @unique
-  fitScore              Int // 0-100
-  painAlignmentScore    Int // 0-100
-  workflowFitScore      Int // 0-100
-  urgencyScore          Int // 0-100
-  adoptionBarrierScore  Int // 0-100
-  risks                 Json? // Array of risks
-  opportunities         Json? // Array of opportunities
+  fitScore              Int
+  painAlignmentScore    Int
+  workflowFitScore      Int
+  urgencyScore          Int
+  adoptionBarrierScore  Int
+  risks                 Json?
+  opportunities         Json?
   recommendedTalkTrack  String?
   recommendedSequence   String?
   recommendedLeadSource String?
@@ -433,40 +567,26 @@ model BdIntel {
 }
 
 model ConsultantDeliverable {
-  id        String  @id @default(cuid())
-  contactId String // Link to Contact (the client)
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  // What we're delivering
-  title       String
-  description String?
-  category    String? // "foundation", "integration", "enrichment", etc.
-  type        String? // "persona", "blog", "upload", etc. - deliverable type
-
-  // Work content (stored as JSON for flexibility)
-  workContent Json? // Actual work artifact (persona data, blog content, etc.)
-
-  // Status tracking
-  status String @default("pending") // "pending" | "in-progress" | "completed" | "blocked"
-
-  // Link to proposal/milestone (optional - can start fresh)
-  proposalId  String?
-  proposal    Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
-  milestoneId String? // Reference to milestone in Proposal.milestones JSON (e.g., "milestone-1", "week-4")
-
-  // Delivery tracking
-  dueDate     DateTime?
-  completedAt DateTime?
-  notes       String?
-
-  // Tenant scoping (for client delivery architecture)
-  companyHQId      String // Always linked to owner's company (tenant boundary)
+  id               String    @id @default(cuid())
+  contactId        String
+  title            String
+  description      String?
+  category         String?
+  type             String?
+  workContent      Json?
+  status           String    @default("pending")
+  proposalId       String?
+  milestoneId      String?
+  dueDate          DateTime?
+  completedAt      DateTime?
+  notes            String?
+  companyHQId      String
+  contactCompanyId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
   companyHQ        CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  contactCompanyId String? // Link to contact's company (can derive from contact.contactCompanyId)
-
-  // Metadata
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  contact          Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  proposal         Proposal? @relation(fields: [proposalId], references: [id])
 
   @@index([contactId])
   @@index([proposalId])
@@ -474,233 +594,164 @@ model ConsultantDeliverable {
   @@map("consultant_deliverables")
 }
 
-enum WorkPackageStatus {
-  ACTIVE
-  COMPLETED
-}
-
-enum WorkItemType {
-  BLOG
-  PERSONA
-  OUTREACH_TEMPLATE
-  EVENT_CLE_PLAN
-  CLE_DECK
-  PRESENTATION_DECK
-  LANDING_PAGE
-}
-
-enum WorkItemStatus {
-  TODO
-  IN_PROGRESS
-  COMPLETED
-}
-
 model WorkPackage {
-  id                String   @id @default(cuid())
-  contactId         String
-  contact           Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  companyId         String?
-  company           Company? @relation(fields: [companyId], references: [id])
+  id                                                   String             @id @default(cuid())
+  companyId                                            String
+  title                                                String
+  description                                          String?
+  prioritySummary                                      String?
+  totalCost                                            Float?
+  effectiveStartDate                                   DateTime?
+  createdAt                                            DateTime           @default(now())
+  updatedAt                                            DateTime           @updatedAt
+  workPackageOwnerId                                   String
+  workPackageClientId                                  String
+  workPackageMemberId                                  String?
+  metadata                                             Json?
+  tags                                                 String[]           @default([])
+  status                                               WorkPackageStatus  @default(ACTIVE)
+  invoices                                             Invoice[]
+  items                                                WorkPackageItem[]
+  phases                                               WorkPackagePhase[]
+  company                                              Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contacts_work_packages_workPackageClientIdTocontacts Contact            @relation("work_packages_workPackageClientIdTocontacts", fields: [workPackageClientId], references: [id])
+  contacts_work_packages_workPackageMemberIdTocontacts Contact?           @relation("work_packages_workPackageMemberIdTocontacts", fields: [workPackageMemberId], references: [id])
+  company_hqs                                          CompanyHQ          @relation(fields: [workPackageOwnerId], references: [id])
 
-  title             String   // Proposal/work package title
-  description       String?  // Proposal description
-  prioritySummary   String?  // Consultant-written summary of key focuses
-  totalCost         Float?   // Total cost from proposal
-  effectiveStartDate DateTime? // Optional timeline start date
-
-  phases            WorkPackagePhase[]
-  items             WorkPackageItem[]
-  invoices          Invoice[] // Invoices linked to this work package
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([contactId])
   @@index([companyId])
+  @@index([status])
+  @@index([workPackageClientId])
+  @@index([workPackageMemberId])
+  @@index([workPackageOwnerId])
   @@map("work_packages")
 }
 
 model WorkPackagePhase {
-  id                  String      @id @default(cuid())
+  id                  String            @id @default(cuid())
   workPackageId       String
-  workPackage         WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-
   name                String
   position            Int
-  description         String?     // Phase description
-  phaseTotalDuration  Int?        // normalized business days (backward compatibility)
-  totalEstimatedHours Int?         // Computed aggregate from items (quantity * estimatedHoursEach)
-
+  description         String?
+  phaseTotalDuration  Int?
+  totalEstimatedHours Int?
+  createdAt           DateTime          @default(now())
+  actualEndDate       DateTime?
+  actualStartDate     DateTime?
+  estimatedEndDate    DateTime?
+  estimatedStartDate  DateTime?
+  status              String?
+  updatedAt           DateTime          @default(now())
   items               WorkPackageItem[]
+  workPackage         WorkPackage       @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
 
-  createdAt           DateTime @default(now())
-
-  @@unique([workPackageId, name, position]) // For idempotent upsert
+  @@unique([workPackageId, name, position])
   @@index([workPackageId])
   @@index([position])
   @@map("work_package_phases")
 }
 
 model WorkPackageItem {
-  id                 String           @id @default(cuid())
-  workPackageId      String
-  workPackage        WorkPackage      @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  workPackagePhaseId String
-  workPackagePhase   WorkPackagePhase @relation(fields: [workPackagePhaseId], references: [id], onDelete: Cascade)
-
-  // CSV fields (primary)
+  id                     String                @id @default(cuid())
+  workPackageId          String
+  workPackagePhaseId     String
   deliverableType        String
   deliverableLabel       String
   deliverableDescription String?
+  itemType               String                @default("")
+  itemLabel              String                @default("")
+  itemDescription        String?
+  quantity               Int
+  unitOfMeasure          String
+  estimatedHoursEach     Int
+  duration               Int?
+  createdAt              DateTime              @default(now())
+  status                 WorkPackageItemStatus @default(NOT_STARTED)
+  workPackage            WorkPackage           @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
+  workPackagePhase       WorkPackagePhase      @relation(fields: [workPackagePhaseId], references: [id], onDelete: Cascade)
 
-  // Legacy fields (backward compatibility - synced with CSV fields)
-  itemType        String // Maps to deliverableType
-  itemLabel       String // Maps to deliverableLabel
-  itemDescription String? // Maps to deliverableDescription
-
-  quantity            Int
-  unitOfMeasure       String // "day" | "week" | "month" | "persona" | "event" | etc.
-  estimatedHoursEach  Int    // Hours per unit (replaces duration concept)
-  duration            Int?   // Legacy field (backward compatibility)
-  status              String @default("not_started") // not_started | in_progress | completed
-
-  collateral          Collateral[]
-  artifacts           WorkArtifact[]
-
-  createdAt           DateTime @default(now())
-
-  @@unique([workPackageId, workPackagePhaseId, deliverableLabel]) // For idempotent upsert
+  @@unique([workPackageId, workPackagePhaseId, deliverableLabel])
   @@index([workPackageId])
   @@index([workPackagePhaseId])
   @@index([deliverableType])
-  @@index([itemType]) // Keep for backward compatibility
-  @@index([status])
+  @@index([itemType])
   @@map("work_package_items")
 }
 
-model WorkArtifact {
-  id                String           @id @default(cuid())
-  workPackageItemId String
-  workPackageItem   WorkPackageItem  @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
-
-  type              String // BLOG | PERSONA | CLE_DECK | TEMPLATE | LANDING_PAGE | etc.
-  title             String?
-  contentJson       Json?
-  status            String  @default("DRAFT") // DRAFT | IN_REVIEW | APPROVED | COMPLETED
-
-  reviewRequestedAt DateTime?
-  reviewCompletedAt DateTime?
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([workPackageItemId])
-  @@index([status])
-  @@index([type])
-  @@map("work_artifacts")
-}
-
-model Collateral {
-  id                String          @id @default(cuid())
-  workPackageItemId String
-  workPackageItem   WorkPackageItem @relation(fields: [workPackageItemId], references: [id], onDelete: Cascade)
-
-  collateralType  String // blog | persona | template | deck | event_targets | page | lead_form
-  collateralRefId String // FK to clientBlogId, clientPersonaId, etc.
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([workPackageItemId])
-  @@index([collateralType])
-  @@index([collateralRefId])
-  @@map("collateral")
-}
-
-// Artifact Models (standalone content models)
 model Blog {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  content     String?
-  author      String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  companyHQId  String
+  title        String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  blogText     String?
+  description  String?
+  presenter    String?
+  sections     Json?
+  subtitle     String?
+  googleDocUrl String?
+  companyHQ    CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
-  @@index([published])
   @@map("blogs")
 }
 
 model Template {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
+  subject     String
+  body        String
+  createdAt   DateTime    @default(now())
   companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  name        String
-  subject     String?
-  body        String?
-  type        String? // "email", "sms", etc.
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  title       String
+  ownerId     String?
+  personaSlug String?
+  campaigns   campaigns[]
+  companyHQ   CompanyHQ   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  owners      Owner?      @relation(fields: [ownerId], references: [id])
 
   @@index([companyHQId])
-  @@index([published])
+  @@index([ownerId])
+  @@index([personaSlug])
   @@map("templates")
 }
 
 model EventPlan {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  eventName   String
-  date        DateTime?
-  location    String?
-  agenda      String?
-  description String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  companyHQId  String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  name         String
+  ownerId      String
+  presenter    String?
+  spacingScore Int?
+  totalCost    Int?
+  totalTrips   Int?
+  year         Int?
 
   @@index([companyHQId])
-  @@index([published])
+  @@index([ownerId])
   @@map("event_plans")
 }
 
-model CleDeck {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  slides      Json? // Array of slide objects
-  presenter   String?
-  description String?
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([companyHQId])
-  @@index([published])
-  @@map("cle_decks")
-}
-
 model Presentation {
-  id          String    @id @default(cuid())
-  companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  slides      Json? // Array of slide objects: [{ slideNumber: 1, title: "...", content: "...", notes: "..." }]
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  companyHQId       String
+  title             String
+  description       String?
+  slides            Json?
+  published         Boolean   @default(false)
+  publishedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  feedback          Json?
+  gammaBlob         String?
+  gammaDeckUrl      String?
+  gammaError        String?
+  gammaPptxUrl      String?
+  gammaStatus       String?
+  presenter         String?
+  gammaGenerationId String?
+  companyHQ         CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
   @@index([published])
@@ -710,15 +761,16 @@ model Presentation {
 model LandingPage {
   id          String    @id @default(cuid())
   companyHQId String
-  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
   title       String
   url         String?
-  content     Json? // Page content structure
+  content     Json?
   description String?
   published   Boolean   @default(false)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  presenter   String?
+  companyHQ   CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
   @@index([companyHQId])
   @@index([published])
@@ -741,32 +793,27 @@ model ProspectCandidate {
 }
 
 model Assessment {
-  id          String     @id @default(cuid())
-  ownerId     String
-  owner       Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  companyHQId String? // Optional: Link to CompanyHQ
-  companyHQ   CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: SetNull)
-
-  // Assessment responses
+  id                   String     @id @default(cuid())
+  ownerId              String
+  companyHQId          String?
   name                 String
   company              String
   industry             String?
-  workTooMuch          String? // "always" | "often" | "sometimes" | "rarely"
-  assignTasks          String? // "never" | "rarely" | "sometimes" | "always"
-  wantMoreClients      String? // "yes" | "maybe" | "no"
-  revenueGrowthPercent Float? // Percentage (e.g., 25 for 25%)
-  totalVolume          Float? // Total revenue/volume
-  bdSpend              Float? // Business development spend
-
-  // Calculated results
-  score               Int? // 0-100 score
-  scoreInterpretation String? // "High Growth Potential" | "Medium Growth Potential" | etc.
-  relateWithUser      String? // First paragraph of insights
-  growthNeeds         String? // Second paragraph of insights
-  rawGptResponse      String? // Full GPT response
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workTooMuch          String?
+  assignTasks          String?
+  wantMoreClients      String?
+  revenueGrowthPercent Float?
+  totalVolume          Float?
+  bdSpend              Float?
+  score                Int?
+  scoreInterpretation  String?
+  relateWithUser       String?
+  growthNeeds          String?
+  rawGptResponse       String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  companyHQ            CompanyHQ? @relation(fields: [companyHQId], references: [id])
+  owner                Owner      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
   @@index([companyHQId])
@@ -795,8 +842,7 @@ model InviteToken {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([contactId])
@@ -805,58 +851,82 @@ model InviteToken {
 }
 
 model CompanyMembership {
-  id          String   @id @default(cuid())
-  userId      String // Contact.firebaseUid (maps to Firebase Auth UID) - stored as string
+  id          String    @id @default(cuid())
+  userId      String
   companyHqId String
-  role        String // "client" | "owner" | "admin"
-  isPrimary   Boolean  @default(false) // Primary HQ for this user
-  createdAt   DateTime @default(now())
+  role        String
+  createdAt   DateTime  @default(now())
+  companyHQ   CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
+  owners      Owner     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Note: userId stores firebaseUid as string - query Contact manually via firebaseUid
-  // Prisma doesn't support relations on nullable unique fields easily
-  companyHQ CompanyHQ @relation(fields: [companyHqId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, companyHqId]) // Prevent duplicate memberships
+  @@unique([userId, companyHqId])
   @@index([userId])
   @@index([companyHqId])
   @@index([userId, companyHqId])
   @@map("company_memberships")
 }
 
-// ============================================
-// BILLING MODELS
-// ============================================
-
 model Invoice {
-  id                String   @id @default(cuid())
-  workPackageId     String
-  workPackage       WorkPackage @relation(fields: [workPackageId], references: [id], onDelete: Cascade)
-  invoiceName       String
-  invoiceDescription String?
-  totalExpected     Int       @default(0)
-  totalReceived     Int       @default(0)
-  status            String    @default("pending") // "pending" | "partial" | "paid"
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  milestones        InvoiceMilestone[]
-  payments          Payment[]
+  id                      String             @id @default(cuid())
+  workPackageId           String?
+  invoiceName             String
+  invoiceDescription      String?
+  totalExpected           Int                @default(0)
+  totalReceived           Int                @default(0)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  invoiceNumber           String?
+  amount                  Float?
+  currency                String             @default("USD")
+  paidAt                  DateTime?
+  paidByContactId         String?
+  stripeCheckoutSessionId String?
+  stripePaymentIntentId   String?
+  stripeCustomerId        String?
+  companyHQId             String
+  companyId               String?
+  contactId               String?
+  dueDate                 DateTime?
+  invoiceType             InvoiceType
+  isRecurring             Boolean            @default(false)
+  lastBilledDate          DateTime?
+  nextBillingDate         DateTime?
+  recurringFrequency      String?
+  status                  InvoiceStatus      @default(NOT_PAID)
+  stripeInvoiceId         String?
+  stripeSubscriptionId    String?
+  milestones              InvoiceMilestone[]
+  company_hqs             CompanyHQ          @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+  companies               Company?           @relation(fields: [companyId], references: [id])
+  contacts                Contact?           @relation(fields: [contactId], references: [id])
+  workPackage             WorkPackage?       @relation(fields: [workPackageId], references: [id])
+  payments                Payment[]
 
   @@index([workPackageId])
   @@index([status])
+  @@index([companyHQId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([invoiceType])
+  @@index([isRecurring])
+  @@index([nextBillingDate])
+  @@index([stripeCustomerId])
+  @@index([stripeInvoiceId])
+  @@index([stripeSubscriptionId])
   @@map("invoices")
 }
 
 model InvoiceMilestone {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   invoiceId      String
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   label          String
   expectedAmount Int
   expectedDate   DateTime?
   description    String?
-  status         String   @default("pending") // "pending" | "paid"
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   payments       Payment[] @relation("PaymentMilestone")
 
   @@index([invoiceId])
@@ -865,18 +935,18 @@ model InvoiceMilestone {
 }
 
 model Payment {
-  id                     String  @id @default(cuid())
-  invoiceId              String
-  invoice                Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  milestoneId            String?
-  milestone              InvoiceMilestone? @relation("PaymentMilestone", fields: [milestoneId], references: [id], onDelete: SetNull)
-  amountReceived         Int
-  currency               String  @default("USD")
-  paidAt                 DateTime
-  stripeSessionId        String? @unique
-  stripePaymentIntentId  String? @unique
-  paidByContactId        String?
-  createdAt              DateTime @default(now())
+  id                    String            @id @default(cuid())
+  invoiceId             String
+  milestoneId           String?
+  amountReceived        Int
+  currency              String            @default("USD")
+  paidAt                DateTime
+  stripeSessionId       String?           @unique
+  stripePaymentIntentId String?           @unique
+  paidByContactId       String?
+  createdAt             DateTime          @default(now())
+  invoice               Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  milestone             InvoiceMilestone? @relation("PaymentMilestone", fields: [milestoneId], references: [id])
 
   @@index([invoiceId])
   @@index([milestoneId])
@@ -886,27 +956,1093 @@ model Payment {
 }
 
 model InvoiceTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  notes     String?
-  milestones InvoiceTemplateMilestone[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String                     @id @default(cuid())
+  name        String
+  notes       String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+  companyHQId String
+  milestones  InvoiceTemplateMilestone[]
+  company_hqs CompanyHQ                  @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
 
+  @@unique([companyHQId, name])
+  @@index([companyHQId])
   @@map("invoice_templates")
 }
 
 model InvoiceTemplateMilestone {
-  id               String   @id @default(cuid())
-  templateId       String
-  template         InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  label            String
-  expectedAmount   Float
-  expectedDate     DateTime?
-  description      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String          @id @default(cuid())
+  templateId     String
+  label          String
+  expectedAmount Float
+  expectedDate   DateTime?
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  template       InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([templateId])
   @@map("invoice_template_milestones")
+}
+
+model GoogleOAuthToken {
+  id           String   @id
+  ownerId      String
+  provider     String   @default("google")
+  refreshToken String
+  scopes       String?
+  email        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  owners       Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
+  @@index([ownerId])
+}
+
+model InboundEmail {
+  id              String       @id
+  from            String?
+  to              String?
+  subject         String?
+  text            String?
+  html            String?
+  headers         String?
+  ingestionStatus String       @default("RECEIVED")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime
+  companySlug     String?
+  companyHQId     String?
+  email           String?
+  sender_ip       String?
+  envelope        String?
+  dkim            String?
+  SPF             String?
+  spam_score      String?
+  spam_report     String?
+  charsets        String?
+  attachments     String?
+  attachment_info String?
+  inboundType     InboundType?
+  autoProcessed       Boolean      @default(false)
+  processingError     String?
+  parsedContactEmail  String?
+  parsedContactName   String?
+  company_hqs         CompanyHQ?   @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@index([companyHQId])
+  @@index([inboundType])
+}
+
+model Meeting {
+  id                 String          @id
+  contactId          String
+  ownerId            String
+  crmId              String
+  meetingDate        DateTime
+  meetingType        MeetingType     @default(OTHER)
+  outcome            MeetingOutcome?
+  notes              String?
+  nextAction         String?
+  nextEngagementDate String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @default(now())
+  summary            String?
+  contacts           Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company_hqs        CompanyHQ       @relation(fields: [crmId], references: [id])
+  owners             Owner           @relation(fields: [ownerId], references: [id])
+
+  @@index([contactId])
+  @@index([contactId, meetingDate])
+  @@index([crmId])
+  @@index([meetingDate])
+  @@index([ownerId])
+}
+
+model MicrosoftAccount {
+  id                   String    @id
+  ownerId              String    @unique
+  microsoftEmail       String
+  microsoftDisplayName String?
+  microsoftTenantId    String?
+  accessToken          String
+  refreshToken         String
+  expiresAt            DateTime?
+  connectedAt          DateTime  @default(now())
+  lastRefreshedAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime
+  owners               Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([microsoftEmail])
+  @@index([ownerId])
+}
+
+model RawMeetingNotes {
+  id          String     @id
+  companyHQId String?
+  from        String?
+  to          String?
+  subject     String?
+  text        String?
+  html        String?
+  email       String?
+  status      String     @default("RECEIVED")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime
+  company_hqs CompanyHQ? @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@index([companyHQId])
+  @@index([status])
+}
+
+model bd_event_ops {
+  id              String            @id
+  companyHQId     String
+  ownerId         String
+  eventPlanId     String?
+  title           String
+  description     String?
+  whyGo           String?
+  eventType       EventType
+  startDate       DateTime?
+  endDate         DateTime?
+  city            String?
+  state           String?
+  country         String?
+  costBand        String?
+  source          EventSource       @default(MANUAL)
+  status          EventOppStatus    @default(CONSIDERING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  eventTunerId    String?
+  prioritySource  String?
+  costEstimate    String?
+  location        String?
+  sponsor         String?
+  timeFrame       String?
+  event_tuners    event_tuners?     @relation(fields: [eventTunerId], references: [id])
+  event_plan_opps event_plan_opps[]
+
+  @@index([companyHQId])
+  @@index([eventPlanId])
+  @@index([eventTunerId])
+  @@index([ownerId])
+  @@index([prioritySource])
+  @@index([source])
+  @@index([status])
+}
+
+model bd_eventop_intel {
+  id               String         @id
+  companyHQId      String
+  ownerId          String
+  eventMetaId      String
+  personaId        String?
+  personaAlignment Int?
+  travelBurden     Int?
+  costFit          Int?
+  ecosystemFit     Int?
+  bdOpportunity    Int?
+  notes            String?
+  status           EventOppStatus @default(CONSIDERING)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime
+  event_metas      event_metas    @relation(fields: [eventMetaId], references: [id])
+
+  @@index([companyHQId])
+  @@index([eventMetaId])
+  @@index([ownerId])
+  @@index([personaId])
+  @@index([status])
+}
+
+model bdos_scores {
+  id               String   @id
+  contactId        String
+  productId        String
+  personaId        String?
+  totalScore       Int
+  personaFit       Int
+  productFit       Int
+  companyReadiness Int
+  buyingPower      Int
+  seniority        Int
+  urgency          Int
+  rationale        String?
+  rawResponse      Json?
+  createdAt        DateTime @default(now())
+
+  @@index([contactId])
+  @@index([createdAt])
+  @@index([personaId])
+  @@index([productId])
+}
+
+model bills {
+  id                      String         @id
+  name                    String
+  description             String?
+  amountCents             Int
+  currency                String         @default("usd")
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime
+  companyId               String?
+  stripeCheckoutSessionId String?
+  checkoutUrl             String?
+  status                  BillSendStatus @default(PENDING)
+  slug                    String?
+  publicBillUrl           String?
+  paidAt                  DateTime?
+  company_hqs             CompanyHQ?     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([paidAt])
+  @@index([slug])
+  @@index([status])
+}
+
+model campaigns {
+  id               String            @id
+  owner_id         String
+  company_hq_id    String?
+  name             String
+  description      String?
+  status           CampaignStatus    @default(DRAFT)
+  type             CampaignType      @default(EMAIL)
+  subject          String?
+  preview_text     String?
+  from_email       String?
+  from_name        String?
+  scheduled_for    DateTime?
+  started_at       DateTime?
+  completed_at     DateTime?
+  total_recipients Int               @default(0)
+  emails_sent      Int               @default(0)
+  emails_delivered Int               @default(0)
+  emails_opened    Int               @default(0)
+  emails_clicked   Int               @default(0)
+  emails_replied   Int               @default(0)
+  emails_bounced   Int               @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  bounce_rate      Float?
+  created_at       DateTime          @default(now())
+  updated_at       DateTime
+  contact_list_id  String?
+  body             String?
+  template_id      String?
+  company_hqs      CompanyHQ?        @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  contact_lists    ContactList?      @relation(fields: [contact_list_id], references: [id])
+  owners           Owner             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  templates        Template?         @relation(fields: [template_id], references: [id])
+  email_activities EmailActivity[]
+  email_sequences  email_sequences[]
+
+  @@index([company_hq_id])
+  @@index([contact_list_id])
+  @@index([created_at])
+  @@index([owner_id])
+  @@index([status])
+  @@index([template_id])
+}
+
+model company_retainers {
+  id                   String           @id
+  companyId            String
+  name                 String
+  description          String?
+  amountCents          Int
+  currency             String           @default("usd")
+  interval             RetainerInterval @default(MONTH)
+  startDate            DateTime?
+  status               RetainerStatus   @default(DRAFT)
+  slug                 String?          @unique
+  publicRetainerUrl    String?
+  stripeSubscriptionId String?          @unique
+  activatedAt          DateTime?
+  paidAt               DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime
+
+  @@index([companyId])
+  @@index([slug])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+}
+
+model contact_analyses {
+  id                    String   @id
+  contactId             String   @unique
+  fitScore              Int?
+  painAlignmentScore    Int?
+  workflowFitScore      Int?
+  urgencyScore          Int?
+  adoptionBarrierScore  Int?
+  risks                 Json?
+  opportunities         Json?
+  recommendedTalkTrack  String?
+  recommendedSequence   String?
+  recommendedLeadSource String?
+  finalSummary          String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime
+  contacts              Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+}
+
+model contact_engagement_log {
+  id              String                 @id
+  contactId       String
+  entryType       EngagementLogEntryType @default(INITIAL)
+  note            String
+  emailActivityId String?                @unique
+  loggedAt        DateTime               @default(now())
+  createdAt       DateTime               @default(now())
+  contacts        Contact                @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, loggedAt])
+}
+
+model content_snips {
+  snipId           String           @id
+  snipName         String
+  snipText         String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  templatePosition TemplatePosition
+  snipSlug         String           @unique
+  personaSlug      String?
+  bestUsedWhen     String?
+
+  @@index([templatePosition])
+}
+
+model csv_imports {
+  id            String       @id
+  financialsId  String
+  fileName      String
+  fileUrl       String
+  rowCount      Int
+  importedCount Int          @default(0)
+  status        ImportStatus @default(PENDING)
+  columnMapping Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime
+
+  @@index([financialsId])
+}
+
+model ecosystem_orgs {
+  id                          String                @id
+  name                        String
+  website                     String?
+  city                        String?
+  state                       String?
+  archetype                   OrganizationArchetype
+  whatTheyDo                  String?
+  annualRevenue               Int?
+  duesInfo                    String?
+  memberCount                 Int?
+  memberDescription           String?
+  memberSeniority             String?
+  memberIndustries            String[]
+  memberReasonForAffiliation  String?
+  memberAffiliationStrength   String?
+  orgRelevanceToCompanyHQ     String?
+  bdCompanyHQAffiliationScore Int?
+  targetPersonaAlignment      Int?
+  createdAt                   DateTime              @default(now())
+
+  @@index([archetype])
+  @@index([name])
+}
+
+model email_sequences {
+  id                  String           @id
+  campaign_id         String?
+  owner_id            String
+  company_hq_id       String?
+  name                String
+  description         String?
+  status              SequenceStatus   @default(DRAFT)
+  auto_pause_on_reply Boolean          @default(true)
+  total_recipients    Int              @default(0)
+  emails_sent         Int              @default(0)
+  emails_opened       Int              @default(0)
+  emails_clicked      Int              @default(0)
+  emails_replied      Int              @default(0)
+  open_rate           Float?
+  click_rate          Float?
+  reply_rate          Float?
+  created_at          DateTime         @default(now())
+  updated_at          DateTime
+  email_activities    EmailActivity[]
+  campaigns           campaigns?       @relation(fields: [campaign_id], references: [id])
+  company_hqs         CompanyHQ?       @relation(fields: [company_hq_id], references: [id], onDelete: Cascade)
+  owners              Owner            @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  sequence_steps      sequence_steps[]
+
+  @@index([campaign_id])
+  @@index([owner_id])
+  @@index([status])
+}
+
+model email_signatures {
+  id         String   @id
+  owner_id   String
+  name       String
+  content    String
+  is_default Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime
+  owners     Owner    @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_id])
+  @@index([owner_id, is_default])
+}
+
+model equity {
+  id           String   @id
+  financialsId String
+  date         DateTime
+  amount       Int
+  description  String
+  category     String?
+  source       String?
+  csvImportId  String?
+  csvRowNumber Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+
+  @@index([category])
+  @@index([date])
+  @@index([financialsId])
+}
+
+model event_metas {
+  id               String             @id
+  name             String
+  seriesName       String?
+  eventType        EventType
+  organizerId      String?
+  city             String?
+  state            String?
+  country          String?
+  startDate        DateTime?
+  endDate          DateTime?
+  dateRange        String?
+  costMin          Int?
+  costMax          Int?
+  currency         String?
+  sourceType       EventSourceType    @default(AI)
+  rawJson          Json?
+  createdAt        DateTime           @default(now())
+  bd_eventop_intel bd_eventop_intel[]
+
+  @@index([eventType])
+  @@index([name])
+  @@index([organizerId])
+}
+
+model event_plan_opps {
+  id           String       @id
+  eventPlanId  String
+  bdEventOppId String
+  order        Int?
+  createdAt    DateTime     @default(now())
+  bd_event_ops bd_event_ops @relation(fields: [bdEventOppId], references: [id], onDelete: Cascade)
+
+  @@unique([eventPlanId, bdEventOppId])
+  @@index([bdEventOppId])
+  @@index([eventPlanId])
+}
+
+model event_tuner_personas {
+  id           String       @id
+  eventTunerId String
+  personaId    String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+  personas     Persona      @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, personaId])
+  @@index([eventTunerId])
+  @@index([personaId])
+}
+
+model event_tuner_states {
+  id           String       @id
+  eventTunerId String
+  state        String
+  createdAt    DateTime     @default(now())
+  event_tuners event_tuners @relation(fields: [eventTunerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventTunerId, state])
+  @@index([eventTunerId])
+  @@index([state])
+}
+
+model event_tuners {
+  id                    String                 @id
+  companyHQId           String
+  ownerId               String
+  name                  String
+  conferencesPerQuarter Int?
+  costRange             EventCostRange?
+  eventSearchRawText    String?
+  travelDistance        TravelDistance?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime
+  bd_event_ops          bd_event_ops[]
+  event_tuner_personas  event_tuner_personas[]
+  event_tuner_states    event_tuner_states[]
+
+  @@index([companyHQId])
+  @@index([isActive])
+  @@index([ownerId])
+}
+
+model expenses {
+  id           String   @id
+  financialsId String
+  date         DateTime
+  amount       Int
+  description  String
+  category     String?
+  vendor       String?
+  receiptUrl   String?
+  csvImportId  String?
+  csvRowNumber Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+
+  @@index([category])
+  @@index([date])
+  @@index([financialsId])
+}
+
+model financials {
+  id          String   @id
+  companyHQId String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model income {
+  id                    String   @id
+  financialsId          String
+  date                  DateTime
+  amount                Int
+  description           String
+  category              String?
+  source                String?
+  stripePaymentIntentId String?  @unique
+  stripeInvoiceId       String?
+  invoiceId             String?
+  csvImportId           String?
+  csvRowNumber          Int?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime
+  company_hqsId         String?
+
+  @@index([category])
+  @@index([date])
+  @@index([financialsId])
+  @@index([stripePaymentIntentId])
+}
+
+model invoice_settings {
+  id                          String    @id
+  companyHQId                 String    @unique
+  invoicePrefix               String?
+  invoiceNumberFormat         String?
+  defaultCurrency             String    @default("USD")
+  defaultPaymentTerms         String?
+  defaultNotes                String?
+  taxId                       String?
+  billingAddress              String?
+  billingEmail                String?
+  autoGenerateNumber          Boolean   @default(true)
+  nextInvoiceNumber           Int       @default(1)
+  platformFeeAmount           Int?
+  platformFeeDescription      String?
+  monthlyRecurringAmount      Int?
+  monthlyRecurringDescription String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime
+  company_hqs                 CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@index([companyHQId])
+}
+
+model outreach_personas {
+  id          String    @id
+  slug        String    @unique
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  contacts    Contact[]
+
+  @@index([slug])
+}
+
+model plans {
+  id              String        @id
+  name            String
+  description     String?
+  interval        PlanInterval?
+  amountCents     Int
+  currency        String        @default("usd")
+  stripeProductId String?
+  stripePriceId   String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  company_hqs     CompanyHQ[]
+
+  @@index([stripePriceId])
+  @@index([stripeProductId])
+}
+
+model platform {
+  id          String      @id
+  name        String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  company_hqs CompanyHQ[]
+}
+
+model relationship_contexts {
+  relationshipContextId String   @id
+  contextOfRelationship String?
+  relationshipRecency   String?
+  companyAwareness      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime
+  contactId             String   @unique
+  formerCompany         String?
+  contacts              Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+}
+
+model saved_events {
+  id               String   @id
+  userId           String
+  eventName        String
+  eventSeriesName  String?
+  organizerName    String
+  producerType     String
+  city             String
+  stateOrRegion    String?
+  startDate        String?
+  endDate          String?
+  costMin          Int?
+  costMax          Int?
+  currency         String
+  personaAlignment Int
+  url              String?
+  rawJson          Json
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model sequence_steps {
+  id               String          @id
+  sequence_id      String
+  step_number      Int
+  name             String?
+  subject          String
+  body             String
+  delay_days       Int             @default(0)
+  delay_hours      Int             @default(0)
+  conditions       Json?
+  from_email       String?
+  from_name        String?
+  total_sent       Int             @default(0)
+  total_opened     Int             @default(0)
+  total_clicked    Int             @default(0)
+  total_replied    Int             @default(0)
+  open_rate        Float?
+  click_rate       Float?
+  reply_rate       Float?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime
+  email_activities EmailActivity[]
+  email_sequences  email_sequences @relation(fields: [sequence_id], references: [id], onDelete: Cascade)
+
+  @@unique([sequence_id, step_number])
+  @@index([sequence_id])
+  @@index([sequence_id, step_number])
+}
+
+model template_relationship_helpers {
+  id               String    @id
+  ownerId          String
+  relationshipType String
+  familiarityLevel String
+  whyReachingOut   String
+  desiredOutcome   String?
+  timeHorizon      String?
+  contextNotes     String?
+  createdAt        DateTime  @default(now())
+  company_hqs      CompanyHQ @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([ownerId])
+}
+
+model template_snippets {
+  id           String   @id
+  companyHQId  String
+  variableName String
+  name         String
+  body         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  intentType   String?
+
+  @@unique([companyHQId, variableName])
+  @@index([companyHQId])
+}
+
+model template_variables {
+  id           String    @id
+  companyHQId  String
+  variableKey  String
+  description  String?
+  source       String
+  dbField      String?
+  computedRule String?
+  isBuiltIn    Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  company_hqs  CompanyHQ @relation(fields: [companyHQId], references: [id], onDelete: Cascade)
+
+  @@unique([companyHQId, variableKey])
+  @@index([companyHQId])
+  @@index([companyHQId, isActive])
+  @@index([companyHQId, isBuiltIn])
+  @@index([companyHQId, source])
+}
+
+model work_collateral {
+  id                String               @id
+  workPackageId     String?
+  workPackageItemId String?
+  presentationId    String?
+  type              String
+  title             String?
+  contentJson       Json?
+  status            WorkCollateralStatus @default(IN_PROGRESS)
+  reviewRequestedAt DateTime?
+  reviewCompletedAt DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime
+
+  @@index([presentationId])
+  @@index([status])
+  @@index([type])
+  @@index([workPackageId])
+  @@index([workPackageItemId])
+}
+
+enum WorkPackageStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum WorkItemType {
+  BLOG
+  PERSONA
+  OUTREACH_TEMPLATE
+  EVENT_CLE_PLAN
+  PRESENTATION_DECK
+  LANDING_PAGE
+}
+
+enum WorkItemStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum BillSendStatus {
+  PENDING
+  PAID
+  EXPIRED
+}
+
+enum BuyerPerson {
+  BUSINESS_OWNER
+  DIRECTOR_VP
+  PRODUCT_USER
+}
+
+enum BuyingReadiness {
+  NOT_READY
+  READY_NO_MONEY
+  READY_WITH_MONEY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CampaignType {
+  EMAIL
+  SEQUENCE
+  ONE_OFF
+}
+
+enum ContactDisposition {
+  HAPPY_TO_RECEIVE_NOTE
+  NEUTRAL
+  DOESNT_CARE
+  ADVOCATE
+  OPTED_OUT
+  WARM
+  WARM_WRONG_CONTACT
+  WARM_NO_NEED
+  COOLING
+}
+
+enum ContactOutreachIntent {
+  PROSPECT
+  TARGET
+}
+
+enum EmailSequenceOrder {
+  OWNER_SEND
+  CONTACT_SEND
+}
+
+enum EmailSource {
+  PLATFORM
+  OFF_PLATFORM
+}
+
+enum EngagementLogEntryType {
+  INITIAL
+  POST_CALL
+  POST_MEETING
+  EMAIL_RESPONSE
+}
+
+enum EngagementType {
+  OUTBOUND_EMAIL
+  CONTACT_RESPONSE
+  MEETING
+  MANUAL
+}
+
+enum EventCostRange {
+  FREE
+  LOW_0_500
+  MEDIUM_500_2000
+  HIGH_2000_5000
+  PREMIUM_5000_PLUS
+  NO_LIMIT
+}
+
+enum EventOppStatus {
+  CONSIDERING
+  SHORTLIST
+  GOING
+  PASSED
+}
+
+enum EventSource {
+  PERSONA
+  USER_PREF
+  MANUAL
+  BD_INTEL
+}
+
+enum EventSourceType {
+  AI
+  CSV
+  MANUAL
+  WEB
+}
+
+enum EventType {
+  ASSOCIATION
+  COMMERCIAL
+  MEDIA
+  INDUSTRY
+  PRIVATE
+  CORPORATE
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum InboundType {
+  OUTREACH
+  MEETING
+}
+
+enum InvoiceStatus {
+  NOT_PAID
+  PAID
+  PARTIAL
+}
+
+enum InvoiceType {
+  PLATFORM_FEE
+  MONTHLY_RECURRING
+  CUSTOM
+  WORK_PACKAGE
+  PLAN_SUBSCRIPTION
+}
+
+enum MeetingOutcome {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  NO_SHOW
+}
+
+enum MeetingType {
+  INTRO
+  FOLLOW_UP
+  PROPOSAL_REVIEW
+  CHECK_IN
+  OTHER
+}
+
+enum NextEngagementPurpose {
+  GENERAL_CHECK_IN
+  UNRESPONSIVE
+  PERIODIC_CHECK_IN
+  REFERRAL_NO_CONTACT
+  MEETING_FOLLOW_UP
+  DECLINED_NURTURE
+  SCHEDULED_MEETING
+  POST_WARM_MEETING_NUDGE
+  PURSUE_INTRO
+  NO_INTRO_REASON_FOLLOW_UP
+  ONE_MORE_TOUCH
+  COMPETITOR_FOLLOW_UP
+  NEW_JOB_CHECK_IN
+}
+
+enum OrganizationArchetype {
+  ASSOCIATION
+  TRADE_GROUP
+  GUILD
+  NONPROFIT
+  GOVERNMENT
+  OTHER
+}
+
+enum PersonaType {
+  DECISION_MAKER
+  INFLUENCER
+  END_USER
+  GATEKEEPER
+  CHAMPION
+  OTHER
+}
+
+enum PlanInterval {
+  MONTH
+  YEAR
+}
+
+enum PlatformAccessStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum RelationshipEnum {
+  COLD
+  WARM
+  ESTABLISHED
+  DORMANT
+}
+
+enum RetainerInterval {
+  MONTH
+}
+
+enum RetainerStatus {
+  DRAFT
+  LINK_SENT
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum SequenceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum TemplatePosition {
+  SUBJECT_LINE
+  OPENING_GREETING
+  CATCH_UP
+  BUSINESS_CONTEXT
+  VALUE_PROPOSITION
+  COMPETITOR_FRAME
+  TARGET_ASK
+  SOFT_CLOSE
+}
+
+enum TravelDistance {
+  LOCAL
+  REGIONAL
+  DOMESTIC
+  INTERNATIONAL
+  NO_LIMIT
+}
+
+enum TypeOfPersonEnum {
+  CURRENT_CLIENT
+  FORMER_CLIENT
+  FORMER_COWORKER
+  PROSPECT
+  PARTNER
+  FRIEND_OF_FRIEND
+}
+
+enum WorkCollateralStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_NEEDED
+  CHANGES_IN_PROGRESS
+  APPROVED
+}
+
+enum WorkPackageItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_NEEDED
+  CHANGES_IN_PROGRESS
+  APPROVED
 }
