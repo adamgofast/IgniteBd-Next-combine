@@ -18,7 +18,8 @@ export interface ParsedCSV {
  */
 export function parseCSV(csvText: string): ParsedCSV {
   const errors: string[] = [];
-  const lines = csvText.split('\n').filter(line => line.trim());
+  const normalized = (csvText ?? '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n').filter(line => line.trim());
   
   if (lines.length === 0) {
     return { headers: [], rows: [], errors: ['CSV file is empty'] };

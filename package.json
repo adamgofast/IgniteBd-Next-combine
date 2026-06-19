@@ -12,6 +12,7 @@
     "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.64",
     "@azure/msal-browser": "^4.26.1",
     "@azure/msal-node": "^3.8.1",
     "@azure/msal-react": "^3.0.21",
@@ -20,17 +21,21 @@
     "@sendgrid/mail": "^8.1.6",
     "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.35.6",
+    "ai": "^6.0.185",
     "axios": "^1.13.2",
     "firebase": "^12.5.0",
     "firebase-admin": "^13.6.0",
     "lucide-react": "^0.553.0",
+    "mailparser": "^3.9.8",
     "next": "16.0.1",
     "openai": "^6.8.1",
     "prisma": "^6.19.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.66.0",
-    "uploadthing": "^7.7.4"
+    "server-only": "^0.0.1",
+    "uploadthing": "^7.7.4",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

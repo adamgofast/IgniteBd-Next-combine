@@ -11,6 +11,7 @@ import {
   findCompanyHQByEmail,
   registerDomain,
 } from '@/lib/services/domainRegistryService';
+import { ensureContactPipeline } from './pipelineService';
 
 interface UpsertContactData {
   email: string;
@@ -121,12 +122,17 @@ export async function upsertContactWithDomain(
     crmId,
   };
 
-  // Upsert contact (create or update by email)
+  // Upsert contact (create or update by email + crmId composite unique constraint)
+  // CRITICAL: Use email_crmId composite constraint, not just email, so contacts can exist
+  // in multiple CompanyHQs (same email, different crmId)
   const { crmId: _, ...updateData } = upsertData; // Remove crmId from update data
   
   const contact = await prisma.contact.upsert({
     where: {
-      email: normalizedEmail,
+      email_crmId: {
+        email: normalizedEmail,
+        crmId: crmId,
+      },
     },
     update: {
       // Update all fields except crmId (tenant identifier shouldn't change on existing contacts)
@@ -156,7 +162,39 @@ export async function upsertContactWithDomain(
     },
   });
 
-  return contact;
+  // Ensure pipeline exists (default to prospect/interest)
+  await ensureContactPipeline(contact.id, {
+    pipeline: 'prospect',
+    stage: 'interest',
+  });
+
+  // Re-fetch contact with pipeline to ensure it's included
+  const contactWithPipeline = await prisma.contact.findUnique({
+    where: { id: contact.id },
+    include: {
+      contactCompany: {
+        select: {
+          id: true,
+          companyName: true,
+        },
+      },
+      companyHQ: {
+        select: {
+          id: true,
+          companyName: true,
+          companyWebsite: true,
+        },
+      },
+      pipeline: {
+        select: {
+          pipeline: true,
+          stage: true,
+        },
+      },
+    },
+  });
+
+  return contactWithPipeline;
 }
 
 /**

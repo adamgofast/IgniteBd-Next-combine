@@ -26,6 +26,7 @@ import {
   Layers,
   Receipt,
   PlayCircle,
+  Inbox,
 } from 'lucide-react';
 
 // Home link - Growth Dashboard
@@ -62,6 +63,7 @@ const navigationGroups = [
       { name: 'Deal Pipelines', path: '/contacts/deal-pipelines', icon: GitBranch },
       { name: 'Enrich', path: '/contacts/enrich', icon: Sparkles },
       { name: 'Outreach', path: '/outreach', icon: MessageSquare },
+      { name: 'Inbound Parse', path: '/inbound-parse', icon: Inbox },
       { name: 'Meetings', path: '/meetings', icon: Calendar },
     ],
   },

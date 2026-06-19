@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { WorkPackageCSVRow } from '@/lib/utils/csv';
+import { computePhaseTimelineStatus } from '@/lib/utils/workPackageTimeline';
 
 export interface HydrationResult {
   workPackageId: string;
@@ -29,7 +30,7 @@ export async function upsertWorkPackage(params: {
 }): Promise<string> {
   const { workPackageId, title, description, totalCost, effectiveStartDate } = params;
 
-  const workPackage = await prisma.workPackage.update({
+  const workPackage = await prisma.work_packages.update({
     where: { id: workPackageId },
     data: {
       ...(title && { title }),
@@ -45,25 +46,48 @@ export async function upsertWorkPackage(params: {
 
 /**
  * Create WorkPackage (no upsert - always create new)
+ * Company-first: requires companyId, workPackageClientId, workPackageOwnerId
  */
 export async function createWorkPackage(params: {
-  contactId: string;
-  companyId?: string;
+  workPackageClientId: string;  // Required - client contact
+  companyId: string;            // Required - client company
+  workPackageOwnerId: string;   // Required - IgniteBD owner (CompanyHQ.id)
+  workPackageMemberId?: string; // Optional - member contact
   title: string;
   description?: string;
   totalCost?: number;
   effectiveStartDate?: Date;
+  status?: string;
+  metadata?: any;
+  tags?: string[];
 }): Promise<string> {
-  const { contactId, companyId, title, description, totalCost, effectiveStartDate } = params;
+  const { 
+    workPackageClientId, 
+    companyId, 
+    workPackageOwnerId,
+    workPackageMemberId,
+    title, 
+    description, 
+    totalCost, 
+    effectiveStartDate,
+    status,
+    metadata,
+    tags,
+  } = params;
 
-  const workPackage = await prisma.workPackage.create({
+  const workPackage = await prisma.work_packages.create({
     data: {
-      contactId,
-      companyId: companyId || null,
+      workPackageClientId,
+      companyId,
+      workPackageOwnerId,
+      ...(workPackageMemberId && { workPackageMemberId }),
       title,
-      description,
-      totalCost,
-      effectiveStartDate,
+      ...(description !== undefined && { description }),
+      ...(totalCost !== undefined && { totalCost }),
+      ...(effectiveStartDate && { effectiveStartDate }),
+      ...(status && { status }),
+      ...(metadata && { metadata }),
+      ...(tags && { tags }),
     },
   });
 
@@ -82,7 +106,7 @@ export async function upsertPhase(params: {
   const { workPackageId, name, position, description } = params;
 
   // Check if phase exists
-  const existing = await prisma.workPackagePhase.findFirst({
+  const existing = await prisma.work_package_phases.findFirst({
     where: {
       workPackageId,
       name,
@@ -92,7 +116,7 @@ export async function upsertPhase(params: {
 
   if (existing) {
     // Update existing
-    const updated = await prisma.workPackagePhase.update({
+    const updated = await prisma.work_package_phases.update({
       where: { id: existing.id },
       data: {
         description,
@@ -103,7 +127,7 @@ export async function upsertPhase(params: {
   }
 
   // Create new
-  const created = await prisma.workPackagePhase.create({
+  const created = await prisma.work_package_phases.create({
     data: {
       workPackageId,
       name,
@@ -142,7 +166,7 @@ export async function upsertItem(params: {
   } = params;
 
   // Check if item exists
-  const existing = await prisma.workPackageItem.findFirst({
+  const existing = await prisma.work_package_items.findFirst({
     where: {
       workPackageId,
       workPackagePhaseId,
@@ -172,7 +196,7 @@ export async function upsertItem(params: {
 
   if (existing) {
     // Update existing
-    const updated = await prisma.workPackageItem.update({
+    const updated = await prisma.work_package_items.update({
       where: { id: existing.id },
       data,
     });
@@ -180,7 +204,7 @@ export async function upsertItem(params: {
   }
 
   // Create new
-  const created = await prisma.workPackageItem.create({
+  const created = await prisma.work_package_items.create({
     data,
   });
 
@@ -191,7 +215,7 @@ export async function upsertItem(params: {
  * Calculate total estimated hours for a phase
  */
 export async function calculatePhaseHours(phaseId: string): Promise<number> {
-  const items = await prisma.workPackageItem.findMany({
+  const items = await prisma.work_package_items.findMany({
     where: { workPackagePhaseId: phaseId },
   });
 
@@ -204,7 +228,7 @@ export async function calculatePhaseHours(phaseId: string): Promise<number> {
  * Calculate total estimated hours for a work package
  */
 export async function calculatePackageHours(workPackageId: string): Promise<number> {
-  const items = await prisma.workPackageItem.findMany({
+  const items = await prisma.work_package_items.findMany({
     where: { workPackageId },
   });
 
@@ -219,7 +243,7 @@ export async function calculatePackageHours(workPackageId: string): Promise<numb
 export async function updatePhaseTotalHours(phaseId: string): Promise<void> {
   const totalHours = await calculatePhaseHours(phaseId);
   
-  await prisma.workPackagePhase.update({
+  await prisma.work_package_phases.update({
     where: { id: phaseId },
     data: { totalEstimatedHours: totalHours },
   });
@@ -229,12 +253,14 @@ export async function updatePhaseTotalHours(phaseId: string): Promise<void> {
  * Full hydration from CSV rows
  */
 export async function hydrateWorkPackageFromCSV(params: {
-  contactId: string;
-  companyId?: string;
+  workPackageClientId: string;  // Required - client contact
+  companyId: string;            // Required - client company
+  workPackageOwnerId: string;   // Required - IgniteBD owner (CompanyHQ.id)
+  workPackageMemberId?: string; // Optional - member contact
   title: string;
   rows: WorkPackageCSVRow[];
 }): Promise<HydrationResult> {
-  const { contactId, companyId, title, rows } = params;
+  const { workPackageClientId, companyId, workPackageOwnerId, workPackageMemberId, title, rows } = params;
 
   if (rows.length === 0) {
     throw new Error('No rows provided for hydration');
@@ -247,8 +273,10 @@ export async function hydrateWorkPackageFromCSV(params: {
 
   // Create WorkPackage
   const workPackageId = await createWorkPackage({
-    contactId,
+    workPackageClientId,
     companyId,
+    workPackageOwnerId,
+    ...(workPackageMemberId && { workPackageMemberId }),
     title,
     description,
     totalCost,
@@ -268,7 +296,7 @@ export async function hydrateWorkPackageFromCSV(params: {
     let phaseId = phaseMap.get(phaseKey);
 
     if (!phaseId) {
-      const existingPhase = await prisma.workPackagePhase.findFirst({
+      const existingPhase = await prisma.work_package_phases.findFirst({
         where: {
           workPackageId,
           name: row.phaseName,
@@ -292,7 +320,7 @@ export async function hydrateWorkPackageFromCSV(params: {
     }
 
     // Upsert item
-    const existingItem = await prisma.workPackageItem.findFirst({
+    const existingItem = await prisma.work_package_items.findFirst({
       where: {
         workPackageId,
         workPackagePhaseId: phaseId,
@@ -342,6 +370,156 @@ export async function hydrateWorkPackageFromCSV(params: {
     itemsCreated,
     itemsUpdated,
     totalEstimatedHours,
+  };
+}
+
+/**
+ * Hydrate WorkPackage with WorkCollateral and calculate progress
+ * Uses WorkCollateral model as source of truth
+ */
+export async function hydrateWorkPackage(
+  workPackage: any,
+  options: { clientView?: boolean; includeTimeline?: boolean } = {}
+): Promise<any> {
+  const { clientView = false, includeTimeline = !clientView } = options;
+
+  // Hydrate each item with its WorkCollateral
+  const hydratedItems = await Promise.all(
+    workPackage.items.map(async (item: any) => {
+      // Get WorkCollateral for this item
+      const workCollateral = await prisma.workCollateral.findMany({
+        where: { workPackageItemId: item.id },
+      });
+
+      const completedCount = workCollateral.filter(
+        (wc) => wc.status === 'APPROVED'
+      ).length;
+
+      const progress = {
+        completed: completedCount,
+        total: item.quantity,
+        percentage: item.quantity > 0 ? Math.round((completedCount / item.quantity) * 100) : 0,
+      };
+
+      return {
+        ...item,
+        workCollateral,
+        progress,
+      };
+    })
+  );
+
+  // Calculate overall progress
+  const totalItems = hydratedItems.length;
+  const completedItems = hydratedItems.filter(
+    (item) => item.progress.completed >= item.progress.total
+  ).length;
+  const overallProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  // Hydrate phases - READ-ONLY (no database mutations)
+  let hydratedPhases: any[] = [];
+  if (workPackage.phases && Array.isArray(workPackage.phases)) {
+    hydratedPhases = workPackage.phases.map((phase: any) => {
+      // Calculate aggregated hours from items in this phase
+      const phaseItems = hydratedItems.filter((item: any) => item.workPackagePhaseId === phase.id);
+      const aggregatedHours = phaseItems.reduce((sum, item) => {
+        return sum + (item.estimatedHoursEach || 0) * (item.quantity || 0);
+      }, 0);
+
+      // Use stored dates as-is
+      const effectiveDate = phase.estimatedStartDate 
+        ? new Date(phase.estimatedStartDate)
+        : (phase.position === 1 && workPackage.effectiveStartDate)
+          ? new Date(workPackage.effectiveStartDate)
+          : null;
+
+      // Calculate end date
+      let expectedEndDate = null;
+      if (includeTimeline) {
+        if (phase.actualEndDate) {
+          expectedEndDate = new Date(phase.actualEndDate);
+        } else if (phase.estimatedEndDate) {
+          expectedEndDate = new Date(phase.estimatedEndDate);
+        } else if (effectiveDate && phase.phaseTotalDuration) {
+          expectedEndDate = new Date(effectiveDate);
+          expectedEndDate.setDate(expectedEndDate.getDate() + phase.phaseTotalDuration);
+        }
+      }
+
+      // Calculate phase status
+      const allItemsCompleted = phaseItems.length > 0 && phaseItems.every(
+        (item: any) => item.status === 'completed' || (item.progress?.completed >= item.progress?.total)
+      );
+      const hasInProgressItems = phaseItems.some((item: any) => item.status === 'in_progress');
+      const phaseStatus = phase.status || (allItemsCompleted ? 'completed' : (hasInProgressItems ? 'in_progress' : 'not_started'));
+
+      // Calculate timeline status
+      const timelineStatus = includeTimeline
+        ? computePhaseTimelineStatus(phaseStatus, expectedEndDate || phase.estimatedEndDate)
+        : null;
+
+      return {
+        ...phase,
+        totalEstimatedHours: phase.totalEstimatedHours || aggregatedHours || 0,
+        estimatedStartDate: phase.estimatedStartDate ? new Date(phase.estimatedStartDate).toISOString() : null,
+        estimatedEndDate: phase.estimatedEndDate ? new Date(phase.estimatedEndDate).toISOString() : null,
+        actualStartDate: phase.actualStartDate ? new Date(phase.actualStartDate).toISOString() : null,
+        actualEndDate: phase.actualEndDate ? new Date(phase.actualEndDate).toISOString() : null,
+        status: phase.status || null,
+        phaseTotalDuration: phase.phaseTotalDuration || null,
+        effectiveDate: effectiveDate ? effectiveDate.toISOString() : null,
+        expectedEndDate: expectedEndDate ? expectedEndDate.toISOString() : null,
+        timelineStatus,
+        items: phaseItems,
+      };
+    });
+
+    // Sort phases by position
+    const sortedPhases = hydratedPhases.sort((a, b) => a.position - b.position);
+    
+    // Current phase = first phase not completed
+    const currentPhase = sortedPhases.find(
+      (phase) => phase.status !== 'completed'
+    ) || null;
+    
+    // Calculate phase progress
+    const totalPhases = sortedPhases.length;
+    const completedPhases = sortedPhases.filter((p) => p.status === 'completed').length;
+    const phaseProgress = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+    
+    return {
+      ...workPackage,
+      items: hydratedItems,
+      phases: sortedPhases,
+      currentPhase,
+      progress: {
+        completed: completedItems,
+        total: totalItems,
+        percentage: overallProgress,
+      },
+      phaseProgress: {
+        completed: completedPhases,
+        total: totalPhases,
+        percentage: phaseProgress,
+      },
+    };
+  }
+
+  return {
+    ...workPackage,
+    items: hydratedItems,
+    phases: hydratedPhases,
+    currentPhase: null,
+    progress: {
+      completed: completedItems,
+      total: totalItems,
+      percentage: overallProgress,
+    },
+    phaseProgress: {
+      completed: 0,
+      total: 0,
+      percentage: 0,
+    },
   };
 }
 
