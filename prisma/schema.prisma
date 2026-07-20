@@ -258,7 +258,6 @@ model Contact {
   careerProgression                                         String?
   careerStabilityScore                                      Int?
   careerTimeline                                            Json?
-  companyId                                                 String?
   companyIndustry                                           String?
   companySize                                               String?
   currentRoleStartDate                                      DateTime?
@@ -329,7 +328,6 @@ model Contact {
   @@index([role])
   @@index([domain])
   @@index([companyDomain])
-  @@index([companyId])
   @@index([contactDisposition])
   @@index([lastEngagementDate])
   @@index([nextContactedAt])
